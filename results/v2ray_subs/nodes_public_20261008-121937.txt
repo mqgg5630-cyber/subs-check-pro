@@ -1,0 +1,53 @@
+vless://9804f109-f750-4dec-9c3a-091982320501@91.107.249.185:6065?security=none&type=tcp&headerType=http&path=%2F%40TurboConfigs---%40TurboConfigs---%40TurboConfigs--%40TurboConfigs---%40TurboConfigs---%40TurboConfigs---%40TurboConfigs---%40TurboConfigs---%40TurboConfigs--%40TurboConfigs---%40TurboConfigs---%40TurboConfigs---%40TurboConfigs---%40TurboConfigs---%40TurboConfigs--%40TurboConfigs---%40TurboConfigs---%40TurboConfigs---&host=testspeed-foreign.tci.ir&packetEncoding=xudp&encryption=mlkem768x25519plus.native.0rtt.bq1M9Mo7StSetydCuYnVBzGMeKNBRamRZfzcZEiulEY#%5BOpenRay%5D%20%F0%9F%87%A9%F0%9F%87%AADE-129
+vless://df53b6c2-8005-475c-9eb9-74e1be785dc8@157.228.128.59:443?security=reality&type=raw&packetEncoding=xudp&sni=addons.mozilla.org&fp=randomized&flow=xtls-rprx-vision&sid=06e00e7c&pbk=QnxkyscHouhaLDJHT47beyenVd4LHi62yfJIeRV01Ws&encryption=none#%5BOpenRay%5D%20%F0%9F%87%AC%F0%9F%87%A7GB-137
+socks://Og%3D%3D@45.74.31.50:5275#[OpenRay] 🇺🇸US-255
+socks://Og%3D%3D@195.201.81.120:9001#195.201.81.120:9001
+socks://Og%3D%3D@45.74.31.50:6192#45.74.31.50:6192
+socks://Og%3D%3D@45.74.31.23:4346#45.74.31.23:4346
+socks://ODg4ODg6ODg4ODg%3D@8.210.36.244:1080#8.210.36.244:1080
+socks://Og%3D%3D@45.74.31.42:8094#45.74.31.42:8094
+vless://489f1717-d3c7-4940-ad68-bdbdbab857f4@129.225.175.227:443?security=tls&type=ws&path=%2Ft.me%2FTEAMNETGRATISCOL&host=x.m-90.xyz&packetEncoding=xudp&sni=x.m-90.xyz&fp=chrome&encryption=none#%F0%9F%87%BA%F0%9F%87%B8%20United%20States%2C%20Wilmington%20%7C%20%5BBL%5D-05
+socks://Og%3D%3D@103.88.234.239:40005#103.88.234.239:40005
+socks://Og%3D%3D@45.74.31.47:8404#45.74.31.47:8404
+socks://Og%3D%3D@45.74.31.23:6924#45.74.31.23:6924
+socks://Og%3D%3D@45.74.31.47:15890#[OpenRay] 🇺🇸US-1148
+socks://Og%3D%3D@45.74.31.30:4660#45.74.31.30:4660
+socks://Og%3D%3D@45.74.31.25:6677#45.74.31.25:6677
+vless://319d5ffb-57e8-4bbd-ac0c-5d55d0c253de@47.80.19.173:2053?security=reality&type=tcp&packetEncoding=none&allowInsecure=1&sni=gateway.icloud.com&fp=chrome&flow=xtls-rprx-vision&sid=3c4041d3&pbk=DfFU5OG93GxB1x25Dl2BTkxKsBTFF4Su4PXYPbYvmms#%40DeltaKroneckerGithub_1902
+socks://Og%3D%3D@45.74.31.41:13793#[OpenRay] 🇺🇸US-794
+socks://Og%3D%3D@45.74.31.23:11314#45.74.31.23:11314
+vless://b585dc5e-55bf-4a8b-913a-27c9ccac05c3@172.93.167.175:443?security=tls&type=ws&path=%2Fvws%2F&host=bab-6.site&packetEncoding=xudp&sni=bab-6.site&fp=chrome&encryption=none#%F0%9F%87%AB%F0%9F%87%B7%20France%2C%20Roubaix%20%7C%20%F0%9F%8C%90%20%7C%20%5BBL%5D-39
+hysteria2://u63SxILNwtrQZ7Y1ZrFaZfsA@8.211.175.236:8443?insecure=1&sni=bing.com#%F0%9F%87%AF%F0%9F%87%B5%20%E6%97%A5%E6%9C%AC%20%7C%20JPN%202
+socks://Og%3D%3D@45.74.31.47:5773#45.74.31.47:5773
+socks://Og%3D%3D@45.74.31.25:4365#45.74.31.25:4365
+socks://Og%3D%3D@45.74.31.23:8031#45.74.31.23:8031
+socks://Og%3D%3D@91.107.179.68:10809#91.107.179.68:10809
+socks://Og%3D%3D@45.74.31.50:4417#[OpenRay] 🇺🇸US-1193
+socks://Og%3D%3D@45.74.31.25:12649#[OpenRay] 🇺🇸US-748
+socks://Og%3D%3D@195.135.255.98:1080#[SOCKS5] D🔴🇱🇻hos[📺🎭🎪]_dokng.com_2501750b
+socks://Og%3D%3D@45.74.31.42:6542#45.74.31.42:6542
+socks://Og%3D%3D@45.74.31.41:13745#45.74.31.41:13745
+socks://Og%3D%3D@45.74.31.30:5151#45.74.31.30:5151
+socks://Og%3D%3D@45.74.31.25:5639#45.74.31.25:5639
+socks://Og%3D%3D@202.47.180.112:1080#202.47.180.112:1080
+vless://3e7bb66e-d7c6-4711-aa05-e4ab0ec58c6d@104.16.106.213:8880?security=none&type=ws&path=%2F&host=shrill-cell-cca7.158-6fa.workers.dev&packetEncoding=xudp#%5BOpenRay%5D%20%F0%9F%87%A8%F0%9F%87%A6CA-240
+ss://bm9uZTpPREk0WmpBd1pHTXRORFF6@103.11.76.248:80/?plugin=simple-obfs%3Bobfs%3Dhttp%3Bobfs-host%3Dupay.10010.com&udp=1#%5BSS%5D%20D%F0%9F%94%B4%F0%9F%87%BA%F0%9F%87%B8hos%5B%F0%9F%8E%AC%F0%9F%A4%96%F0%9F%93%BA%F0%9F%8E%AD%5D_dokng.com_526e1023
+socks://Og%3D%3D@45.74.31.47:12800#[OpenRay] 🇺🇸US-370
+socks://Og%3D%3D@45.74.31.47:5752#45.74.31.47:5752
+socks://Og%3D%3D@45.74.31.30:6693#45.74.31.30:6693
+socks://Og%3D%3D@45.74.31.30:5285#45.74.31.30:5285
+socks://Og%3D%3D@45.74.31.41:11059#[OpenRay] 🇺🇸US-1388
+socks://Og%3D%3D@45.74.31.23:4249#45.74.31.23:4249
+socks://Og%3D%3D@45.74.31.42:5607#45.74.31.42:5607
+socks://Og%3D%3D@45.74.31.30:7081#45.74.31.30:7081
+socks://Og%3D%3D@45.74.31.25:5180#45.74.31.25:5180
+socks://Og%3D%3D@45.74.31.30:5962#45.74.31.30:5962
+socks://Og%3D%3D@45.74.31.47:6711#45.74.31.47:6711
+socks://Og%3D%3D@45.74.31.23:4979#45.74.31.23:4979
+vless://489f1717-d3c7-4940-ad68-bdbdbab857f4@172.64.229.14:443?security=tls&type=ws&path=%2Ft.me%2FTEAMNETGRATISCOL&host=x.m-90.xyz&packetEncoding=xudp&sni=x.m-90.xyz&fp=chrome&encryption=none#%F0%9F%87%BA%F0%9F%87%B8%20United%20States%2C%20Wilmington%20%7C%20%5BBL%5D-13
+socks://Og%3D%3D@45.74.31.23:5701#45.74.31.23:5701
+socks://Og%3D%3D@45.74.31.50:4287#[OpenRay] 🇺🇸US-1792
+socks://Og%3D%3D@45.74.31.41:11708#45.74.31.41:11708
+vless://df53b6c2-8005-475c-9eb9-74e1be785dc8@157.228.128.59:443?security=reality&type=tcp&packetEncoding=none&allowInsecure=1&sni=addons.mozilla.org&fp=chrome&flow=xtls-rprx-vision&sid=06e00e7c&pbk=QnxkyscHouhaLDJHT47beyenVd4LHi62yfJIeRV01Ws#%40DeltaKroneckerGithub_2022
+socks://Og%3D%3D@45.74.31.30:11469#45.74.31.30:11469
+socks://Og%3D%3D@45.74.31.47:15728#[OpenRay] 🇺🇸US-1303
