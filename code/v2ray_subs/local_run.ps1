@@ -122,16 +122,22 @@ function Find-V2rayN {
     foreach ($p in $procs) {
         try { if ($p.Path) { [void]$dirs.Add((Split-Path -Parent $p.Path)) } } catch { }
     }
+    $procDirs = @($dirs | Select-Object -Unique)
     $roots = @($env:LOCALAPPDATA, (Join-Path $env:LOCALAPPDATA 'Programs'), $env:ProgramFiles, 'D:\', 'E:\', 'F:\', (Join-Path $env:USERPROFILE 'Desktop'), (Join-Path $env:USERPROFILE 'Downloads'))
     foreach ($root in $roots) {
         if (-not $root -or -not (Test-Path -LiteralPath $root)) { continue }
         Get-ChildItem -LiteralPath $root -Directory -ErrorAction SilentlyContinue | Where-Object { $_.Name -like 'v2rayN*' } | ForEach-Object { [void]$dirs.Add($_.FullName) }
     }
-    foreach ($d in @($dirs | Select-Object -Unique)) {
+    $all = @($dirs | Select-Object -Unique)
+    foreach ($d in $all) {
         $db = Join-Path $d 'guiConfigs\guiNDB.db'
         if (Test-Path -LiteralPath $db) {
-            return [pscustomobject]@{ dir = $d; db = $db; running = ($procs.Count -gt 0) }
+            return [pscustomobject]@{ dir = $d; db = $db; running = ($procs.Count -gt 0); hasDb = $true }
         }
+    }
+    if ($procDirs.Count -gt 0) {
+        $d0 = [string]$procDirs[0]
+        return [pscustomobject]@{ dir = $d0; db = (Join-Path $d0 'guiConfigs\guiNDB.db'); running = ($procs.Count -gt 0); hasDb = $false }
     }
     return $null
 }
@@ -430,6 +436,11 @@ function Invoke-Run {
             $imp['dir_name'] = Split-Path -Leaf $v.dir
             $imp['error'] = 'v2rayN not running'
             $importLine = 'v2rayN is not running, so nothing was imported. Start v2rayN and request the import again.'
+        } elseif (-not $v.hasDb) {
+            $imp['running'] = $true
+            $imp['dir_name'] = Split-Path -Leaf $v.dir
+            $imp['error'] = 'guiNDB.db not found next to v2rayN.exe'
+            $importLine = 'The v2rayN database was not found where expected, so nothing was imported.'
         } else {
             $imp['running'] = $true
             $imp['dir_name'] = Split-Path -Leaf $v.dir
