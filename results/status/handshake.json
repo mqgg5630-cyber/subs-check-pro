@@ -1,9 +1,9 @@
 {
-  "round": 1,
-  "arena_state": "awaiting_check",
-  "local_state": "pending",
-  "arena_updated": "2026-10-08 02:08:09",
-  "local_updated": null,
-  "host": "",
-  "note": "probe round 1: read-only environment report for v2ray pipeline (mode=probe)"
+    "round":  1,
+    "arena_state":  "awaiting_check",
+    "local_state":  "passed",
+    "arena_updated":  "2026-10-08 02:08:09",
+    "local_updated":  "2026-10-08 10:30:41",
+    "host":  "LAPTOP-R77M5D6M",
+    "note":  "probe round 1: read-only environment report for v2ray pipeline (mode=probe)"
 }
