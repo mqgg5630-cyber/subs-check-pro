@@ -284,6 +284,120 @@ function Write-Receipt([System.Collections.IDictionary]$r) {
     return $name
 }
 
+function Get-NodeInfo([string]$b64Path) {
+    # Decode the subscription (base64 of share links) and keep every "scheme://" line.
+    # http/https lines are not share links and are skipped.
+    $raw = [string](Get-Content -LiteralPath $b64Path -Raw -Encoding UTF8)
+    $clean = $raw -replace '\s', ''
+    $plain = $raw
+    try { $plain = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($clean)) } catch { $plain = $raw }
+    $nodes = New-Object System.Collections.ArrayList
+    foreach ($ln in ($plain -split "`r?`n")) {
+        $t = $ln.Trim()
+        if ($t -match '^([A-Za-z][A-Za-z0-9+.-]*)://') {
+            $sch = $matches[1].ToLower()
+            if ($sch -ne 'http' -and $sch -ne 'https') { [void]$nodes.Add($t) }
+        }
+    }
+    $uniq = @($nodes | Select-Object -Unique)
+    $hist = @{}
+    foreach ($n in $uniq) {
+        $sch2 = (($n -split '://', 2)[0]).ToLower()
+        if ($hist.ContainsKey($sch2)) { $hist[$sch2] = [int]$hist[$sch2] + 1 } else { $hist[$sch2] = 1 }
+    }
+    return @{ nodes = $uniq; hist = $hist; plain_lines = @($plain -split "`r?`n").Count }
+}
+
+function Get-Breakdown([hashtable]$hist) {
+    $pairs = @()
+    foreach ($k in $hist.Keys) { $pairs += [pscustomobject]@{ k = [string]$k; v = [int]$hist[$k] } }
+    $sorted = @($pairs | Sort-Object -Property @{ Expression = 'v'; Descending = $true }, @{ Expression = 'k'; Descending = $false })
+    $parts = @()
+    foreach ($x in $sorted) { $parts += ($x.k + ' ' + $x.v) }
+    return ($parts -join ' / ')
+}
+
+function Invoke-Refresh {
+    # No check and no v2rayN write here: rebuild the plain list, README and manifest
+    # of the newest delivered Desktop folder from its own base64 file.
+    $script:exitCode = 2
+    $st = Read-Settings
+    $desk = [Environment]::GetFolderPath('Desktop')
+    $r = @{ mode = 'refresh'; stamp = $stamp; started = (Get-Date).ToString('yyyy-MM-dd HH:mm:ss'); state = 'failed'; stage = 'find'; delivered = $false; imported = $false }
+    try {
+        $cand = @(Get-ChildItem -LiteralPath $desk -Directory -Filter ([string]$st.desktop_folder_prefix + '*') -ErrorAction SilentlyContinue | Where-Object { Test-Path -LiteralPath (Join-Path $_.FullName 'v2ray_subscription_base64.txt') } | Sort-Object -Property Name -Descending)
+        if ($cand.Count -eq 0) { throw 'no delivered folder with a subscription file was found' }
+        $folder = $cand[0].FullName
+        $r['folder'] = 'Desktop\' + $cand[0].Name
+
+        $r['stage'] = 'collect'
+        $info = Get-NodeInfo (Join-Path $folder 'v2ray_subscription_base64.txt')
+        $nodes = @($info['nodes'])
+        if ($nodes.Count -eq 0) { throw 'no share links in the delivered subscription' }
+        $breakdown = Get-Breakdown $info['hist']
+        $r['node_counts'] = @{ total = $nodes.Count; by_scheme = $info['hist'] }
+        Say ('refresh: ' + $nodes.Count + ' share links (' + $breakdown + ')')
+
+        $r['stage'] = 'write'
+        $old = $null
+        $manPath = Join-Path $folder 'manifest.json'
+        if (Test-Path -LiteralPath $manPath) { $old = Get-Content -LiteralPath $manPath -Raw -Encoding UTF8 | ConvertFrom-Json }
+        $oldImp = $null
+        if ($old -ne $null) { $oldImp = $old.v2rayn }
+        $okImp = ($oldImp -ne $null -and [bool]$oldImp.ok)
+        $importLine = 'v2rayN: see the receipt for the import result.'
+        if ($okImp) {
+            $importLine = 'v2rayN: added subscription group "' + [string]$oldImp.group + '" with ' + [string]$oldImp.profiles + ' node(s). The active node and the system proxy were not changed.'
+        }
+
+        $fPlain = Join-Path $folder 'v2ray_nodes_plain.txt'
+        $fReadme = Join-Path $folder 'README.txt'
+        $fManifest = Join-Path $folder 'manifest.json'
+        Write-Utf8 $fPlain (($nodes -join "`n") + "`n")
+        $tpl = [string](Get-Content -LiteralPath (Join-Path $repo 'code\v2ray_subs\desktop_readme.txt') -Raw -Encoding UTF8)
+        $txt = $tpl
+        $txt = $txt.Replace('{{generated_at}}', (Get-Date).ToString('yyyy-MM-dd HH:mm'))
+        $txt = $txt.Replace('{{version}}', [string]$st.subs_check_pro_version)
+        $txt = $txt.Replace('{{source_count}}', [string](@($st.sub_urls_remote).Count))
+        $txt = $txt.Replace('{{total}}', [string]$nodes.Count)
+        $txt = $txt.Replace('{{breakdown}}', $breakdown)
+        $txt = $txt.Replace('{{import_line}}', $importLine)
+        Write-Utf8 $fReadme $txt $true
+
+        $files = @()
+        foreach ($f in @((Join-Path $folder 'v2ray_subscription_base64.txt'), $fPlain, $fReadme)) {
+            $fi = Get-Item -LiteralPath $f
+            $files += @{ name = $fi.Name; bytes = $fi.Length; sha256 = (Get-FileHash -LiteralPath $f -Algorithm SHA256).Hash.ToLower() }
+        }
+        $r['files'] = $files
+        $man = @{
+            generated = (Get-Date).ToString('yyyy-MM-dd HH:mm:ss')
+            refreshed_by = 'refresh mode (same subscription file, rebuilt lists)'
+            subs_check_pro = [string]$st.subs_check_pro_version
+            source_index_count = @($st.sub_urls_remote).Count
+            node_counts = $r['node_counts']
+            files = $files
+            v2rayn = $oldImp
+            note = 'counts and hashes only; node links are only in v2ray_nodes_plain.txt and the base64 file'
+        }
+        Write-Utf8 $fManifest (($man | ConvertTo-Json -Depth 6) + "`n")
+
+        $r['delivered'] = $true
+        $r['imported'] = $okImp
+        if ($okImp) { $r['v2rayn_profiles'] = [int]$oldImp.profiles }
+        if ($okImp) { $r['matches_v2rayn_count'] = ([int]$oldImp.profiles -eq $nodes.Count) }
+        $r['state'] = $(if ($okImp) { 'ok' } else { 'delivered_not_imported' })
+        $script:exitCode = $(if ($okImp) { 0 } else { 2 })
+    } catch {
+        $r['error'] = [string]$_.Exception.Message
+        Say ('FAILED at stage ' + $r['stage'] + ': ' + $r['error'])
+        $script:exitCode = 2
+    }
+    $r['finished'] = (Get-Date).ToString('yyyy-MM-dd HH:mm:ss')
+    $name = Write-Receipt $r
+    Say ('receipt: results/v2ray_subs/' + $name + ' state=' + $r['state'])
+}
+
 # ---------------------------------------------------------------- probe mode
 function Invoke-Probe {
     $script:exitCode = 0
@@ -409,29 +523,14 @@ function Invoke-Run {
             throw 'no base64 subscription was produced (check or sub-store did not finish)'
         }
 
-        # 4. collect: decode base64, keep only share links
+        # 4. collect: decode base64, keep every share link (any scheme://, not http/https)
         $r['stage'] = 'collect'
-        $raw = [string](Get-Content -LiteralPath $b64Path -Raw -Encoding UTF8)
-        $clean = $raw -replace '\s', ''
-        $plain = $raw
-        try { $plain = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($clean)) } catch { $plain = $raw }
-        $nodes = @()
-        foreach ($ln in ($plain -split "`r?`n")) {
-            $t = $ln.Trim()
-            if ($t -match '^(vmess|vless|trojan|ss|ssr|hysteria2|hy2|tuic)://') { $nodes += $t }
-        }
-        $nodes = @($nodes | Select-Object -Unique)
-        if ($nodes.Count -eq 0) { throw 'base64 output contained no supported share links' }
-        $cnt = @{ vmess = 0; vless = 0; trojan = 0; ss = 0; other = 0 }
-        foreach ($n in $nodes) {
-            if ($n -like 'vmess://*') { $cnt['vmess'] += 1 }
-            elseif ($n -like 'vless://*') { $cnt['vless'] += 1 }
-            elseif ($n -like 'trojan://*') { $cnt['trojan'] += 1 }
-            elseif ($n -like 'ss://*') { $cnt['ss'] += 1 }
-            else { $cnt['other'] += 1 }
-        }
-        $r['node_counts'] = @{ total = $nodes.Count; vmess = $cnt['vmess']; vless = $cnt['vless']; trojan = $cnt['trojan']; ss = $cnt['ss']; other = $cnt['other'] }
-        Say ('usable nodes: ' + $nodes.Count + ' (vmess ' + $cnt['vmess'] + ', vless ' + $cnt['vless'] + ', trojan ' + $cnt['trojan'] + ', ss ' + $cnt['ss'] + ')')
+        $info = Get-NodeInfo $b64Path
+        $nodes = @($info['nodes'])
+        if ($nodes.Count -eq 0) { throw 'base64 output contained no share links' }
+        $breakdown = Get-Breakdown $info['hist']
+        $r['node_counts'] = @{ total = $nodes.Count; by_scheme = $info['hist'] }
+        Say ('usable nodes: ' + $nodes.Count + ' (' + $breakdown + ')')
 
         # 5. deliver: NEW folder on the Windows Desktop
         $r['stage'] = 'deliver'
@@ -512,11 +611,7 @@ function Invoke-Run {
         $txt = $txt.Replace('{{version}}', [string]$st.subs_check_pro_version)
         $txt = $txt.Replace('{{source_count}}', [string](@($st.sub_urls_remote).Count))
         $txt = $txt.Replace('{{total}}', [string]$nodes.Count)
-        $txt = $txt.Replace('{{vmess}}', [string]$cnt['vmess'])
-        $txt = $txt.Replace('{{vless}}', [string]$cnt['vless'])
-        $txt = $txt.Replace('{{trojan}}', [string]$cnt['trojan'])
-        $txt = $txt.Replace('{{ss}}', [string]$cnt['ss'])
-        $txt = $txt.Replace('{{other}}', [string]$cnt['other'])
+        $txt = $txt.Replace('{{breakdown}}', $breakdown)
         $txt = $txt.Replace('{{import_line}}', $importLine)
         Write-Utf8 $fReadme $txt $true
         $files = @()
@@ -557,6 +652,7 @@ function Invoke-Run {
 switch ($Mode) {
     'probe' { Invoke-Probe }
     'run' { Invoke-Run }
+    'refresh' { Invoke-Refresh }
     default { Say ('unknown mode: ' + $Mode); $script:exitCode = 1 }
 }
 if ($Mode -eq 'probe') {

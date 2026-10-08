@@ -3,7 +3,7 @@ subs-check-pro 可用 V2Ray 节点（自动生成）
 生成时间：{{generated_at}}
 检测工具：subs-check-pro {{version}}（官方 Windows 包，已校验 SHA256）
 订阅来源：sinspired/airport 合并列表（{{source_count}} 个索引）
-通过检测的节点：{{total}} 个（vmess {{vmess}} / vless {{vless}} / trojan {{trojan}} / ss {{ss}} / 其他 {{other}}）
+通过检测的节点：{{total}} 个（按协议：{{breakdown}}）
 
 文件说明
   v2ray_subscription_base64.txt  V2Ray 订阅（base64），可直接粘贴到 v2rayN 的订阅地址位置
