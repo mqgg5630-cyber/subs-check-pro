@@ -1,9 +1,9 @@
 {
-    "round":  7,
-    "arena_state":  "awaiting_check",
-    "local_state":  "passed",
-    "arena_updated":  "2026-10-08 04:18:23",
-    "local_updated":  "2026-10-08 12:19:37",
-    "host":  "LAPTOP-R77M5D6M",
-    "note":  "round 7: export the plain node list again (fixed line check)"
+  "round": 7,
+  "arena_state": "accepted",
+  "local_state": "passed",
+  "arena_updated": "2026-10-08 04:20:24",
+  "local_updated": "2026-10-08 12:19:37",
+  "host": "LAPTOP-R77M5D6M",
+  "note": "round 7: export the plain node list again (fixed line check)"
 }
