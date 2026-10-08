@@ -147,7 +147,7 @@ function Get-DownloadRoutes {
             [void]$list.Add(@{ name = ('v2rayN-local-' + $port); proxy = ('http://127.0.0.1:' + $port) })
         }
     }
-    return ,($list.ToArray())
+    return $list.ToArray()
 }
 
 function Save-Remote([string]$uri, [string]$outFile, [string]$proxyUrl, [int]$timeoutSec) {
@@ -318,7 +318,7 @@ function Invoke-Run {
         $r['stage'] = 'config'
         $ports = Get-FreePorts 2
         $outRun = Join-Path $work 'output'
-        foreach ($f in @('base64.txt', 'all.yaml', 'mihomo.yaml')) {
+        foreach ($f in @('sub\base64.txt', 'sub\all.yaml', 'sub\mihomo.yaml')) {
             Remove-Item -LiteralPath (Join-Path $outRun $f) -Force -ErrorAction SilentlyContinue
         }
         $cfgPath = Join-Path $work 'config.yaml'
@@ -347,8 +347,9 @@ function Invoke-Run {
         $t0 = Get-Date
         $proc = Start-Process -FilePath $exe -ArgumentList ('-f "' + $cfgPath + '"') -WorkingDirectory $work -WindowStyle Hidden -PassThru -RedirectStandardOutput $runLog -RedirectStandardError $errLog
         Say ('subs-check-pro started, pid ' + $proc.Id)
-        $allYaml = Join-Path $outRun 'all.yaml'
-        $b64Path = Join-Path $outRun 'base64.txt'
+        # subs-check-pro 'local' save method writes into <output-dir>\sub\ (seen in the round-2 log)
+        $allYaml = Join-Path $outRun 'sub\all.yaml'
+        $b64Path = Join-Path $outRun 'sub\base64.txt'
         $deadline = $t0.AddMinutes([double]$st.check_timeout_min)
         $sawAll = $null
         $gotB64 = $false
