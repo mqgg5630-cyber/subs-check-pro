@@ -9,8 +9,10 @@
 | `probe` | 只读体检：系统、v2rayN 进程与数据库、Python、端口、GitHub 与订阅源可达性 | 只写 `probe_*.txt` |
 | `run` | subs-check-pro 检测默认订阅源 → 可用节点写入桌面**新文件夹** → v2rayN 新增**一个**订阅分组 | 桌面新文件夹；v2rayN 数据库新增一行（导入前自动备份） |
 | `refresh` | 只读取最新交付的桌面文件夹，重新生成明文列表、README、清单（不检测、不导入、不新建文件夹） | 桌面该文件夹内的三个文件 |
+| `export` | 把最新交付文件夹里的明文节点列表复制到 `results/v2ray_subs/nodes_public_<时间>.txt`，节点会进入 git（公开仓库）。只在你明确确认公开推送后使用；不检测、不导入、不写 v2rayN | 只写 `nodes_public_*.txt` 与回执 |
 
 当前 `mode.txt` 为 `probe`（只读）。需要重新导入时，把它改为 `run` 并发起新请求。
+导出（`export`）会把节点列表公开到 git，只在你明确确认公开推送后使用；导出完成后把 `mode.txt` 改回 `probe`。
 
 ## 文件
 
@@ -24,7 +26,7 @@
 ## 数据去向
 
 - **节点与订阅内容只在本机**：桌面 `v2ray-subs-<时间>\`，工作目录 `%LOCALAPPDATA%\subs-check-pro-d2a66b2d\`。不进 git。
-- git 里只有：体检报告 `probe_*.txt`、回执 `RECEIPT_*.json` 与 `RECEIPT_LATEST.json`、值守日志 `check_r*.txt`。
+- git 里只有：体检报告 `probe_*.txt`、回执 `RECEIPT_*.json` 与 `RECEIPT_LATEST.json`、值守日志 `check_r*.txt`；只有确认公开推送后才会多出 `nodes_public_*.txt`（节点列表，公开）。
 - 回执和日志不含节点链接；Windows 用户名会被替换为 `<user>`。
 
 ## 下载 subs-check-pro 的方式

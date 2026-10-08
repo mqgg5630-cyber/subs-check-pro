@@ -8,7 +8,13 @@
 #           group is added to v2rayN. v2rayN is not restarted, the active node
 #           and the system proxy are not changed.
 # Exit 0 = passed. Anything else = failed (the receipt says at which stage).
-# Node links never go to git: they stay in the Desktop folder.
+#   refresh: rebuilds the plain list, README and manifest of the newest Desktop
+#           folder from its own base64 file. No check, no import.
+#   export : copies the newest plain node list to
+#           results/v2ray_subs/nodes_public_<stamp>.txt so that it goes to git.
+#           Only after the user explicitly confirmed a PUBLIC push. Set mode.txt
+#           back to probe afterwards.
+# Node links stay in the Desktop folder unless an export was requested.
 # Keep this file ASCII-only: Windows PowerShell 5.1 reads .ps1 as ANSI.
 param([string]$Mode = '')
 
@@ -649,10 +655,58 @@ function Invoke-Run {
     Say ('receipt: results/v2ray_subs/' + $name + ' state=' + $r['state'])
 }
 
+# ---------------------------------------------------------------- export mode
+function Invoke-Export {
+    # Runs only after the user explicitly confirmed a PUBLIC push. Copies the
+    # newest delivered plain node list into results/v2ray_subs so the watcher
+    # commits and pushes it. No check, no v2rayN write. Every line must be a
+    # share link, otherwise nothing is exported.
+    $script:exitCode = 2
+    $st = Read-Settings
+    $desk = [Environment]::GetFolderPath('Desktop')
+    $r = @{ mode = 'export'; stamp = $stamp; started = (Get-Date).ToString('yyyy-MM-dd HH:mm:ss'); state = 'failed'; stage = 'find' }
+    try {
+        $cand = @(Get-ChildItem -LiteralPath $desk -Directory -Filter ([string]$st.desktop_folder_prefix + '*') -ErrorAction SilentlyContinue | Where-Object { Test-Path -LiteralPath (Join-Path $_.FullName 'v2ray_nodes_plain.txt') } | Sort-Object -Property Name -Descending)
+        if ($cand.Count -eq 0) { throw 'no delivered folder with a plain node list was found' }
+        $src = Join-Path $cand[0].FullName 'v2ray_nodes_plain.txt'
+        $r['folder'] = 'Desktop\' + $cand[0].Name
+
+        $r['stage'] = 'validate'
+        $text = [System.IO.File]::ReadAllText($src, [System.Text.Encoding]::UTF8)
+        $lines = @($text -split "`r?`n" | ForEach-Object { $_.Trim() } | Where-Object { $_ -ne '' })
+        if ($lines.Count -eq 0) { throw 'the plain node list is empty' }
+        $hist = @{}
+        foreach ($ln in $lines) {
+            if ($ln -notmatch '^[A-Za-z][A-Za-z0-9+.-]*://\S+$') { throw 'a line is not a share link, export refused' }
+            $sch = (($ln -split '://', 2)[0]).ToLower()
+            if ($hist.ContainsKey($sch)) { $hist[$sch] = [int]$hist[$sch] + 1 } else { $hist[$sch] = 1 }
+        }
+        $breakdown = Get-Breakdown $hist
+        $r['node_counts'] = @{ total = $lines.Count; by_scheme = $hist }
+
+        $r['stage'] = 'write'
+        $outName = 'nodes_public_' + $stamp + '.txt'
+        $dst = Join-Path $outDir $outName
+        Write-Utf8 $dst (($lines -join "`n") + "`n")
+        $r['file'] = @{ name = $outName; bytes = (Get-Item -LiteralPath $dst).Length; sha256 = (Get-FileHash -LiteralPath $dst -Algorithm SHA256).Hash.ToLower() }
+        Say ('export: ' + $lines.Count + ' share links (' + $breakdown + ') -> results/v2ray_subs/' + $outName)
+        $r['state'] = 'ok'
+        $script:exitCode = 0
+    } catch {
+        $r['error'] = [string]$_.Exception.Message
+        Say ('FAILED at stage ' + $r['stage'] + ': ' + $r['error'])
+        $script:exitCode = 2
+    }
+    $r['finished'] = (Get-Date).ToString('yyyy-MM-dd HH:mm:ss')
+    $rName = Write-Receipt $r
+    Say ('receipt: results/v2ray_subs/' + $rName + ' state=' + $r['state'])
+}
+
 switch ($Mode) {
     'probe' { Invoke-Probe }
     'run' { Invoke-Run }
     'refresh' { Invoke-Refresh }
+    'export' { Invoke-Export }
     default { Say ('unknown mode: ' + $Mode); $script:exitCode = 1 }
 }
 if ($Mode -eq 'probe') {
