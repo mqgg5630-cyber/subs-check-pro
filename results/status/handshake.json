@@ -1,9 +1,9 @@
 {
-    "round":  5,
-    "arena_state":  "awaiting_check",
-    "local_state":  "passed",
-    "arena_updated":  "2026-10-08 03:31:54",
-    "local_updated":  "2026-10-08 11:35:35",
-    "host":  "LAPTOP-R77M5D6M",
-    "note":  "round 5: refresh mode. Rebuilds the plain node list, README counts and manifest of the newest Desktop folder from its own subscription file (no new check, no new v2rayN import, no new folder). Round 4 imported 53 nodes but the lists showed 10 because the parser only knew 4 schemes."
+  "round": 5,
+  "arena_state": "accepted",
+  "local_state": "passed",
+  "arena_updated": "2026-10-08 03:36:54",
+  "local_updated": "2026-10-08 11:35:35",
+  "host": "LAPTOP-R77M5D6M",
+  "note": "round 5 refresh passed: 53 nodes in the Desktop folder, matches the v2rayN group count. Watcher can go idle."
 }
