@@ -57,7 +57,7 @@ tick() {
     return 0
   fi
 
-  if ! timeout 90 in_repo fetch --quiet "$REMOTE" "$BRANCH" 2>>"$LOG"; then
+  if ! timeout 90 git -C "$REPO" fetch --quiet "$REMOTE" "$BRANCH" 2>>"$LOG"; then
     log "fetch failed (network?) - will retry"
     return 0
   fi
@@ -73,7 +73,9 @@ tick() {
       log "gate failed - not committing $count change(s)"
       return 0
     fi
-    in_repo add -- "${ALLOW_PATHS[@]}" 2>>"$LOG"
+    local existing=() p
+    for p in "${ALLOW_PATHS[@]}"; do [ -e "$REPO/$p" ] && existing+=("$p"); done
+    in_repo add -- "${existing[@]}" 2>>"$LOG"
     for p in "${NEVER_PUSH[@]}"; do in_repo reset -q -- "$p" 2>/dev/null || true; done
     if in_repo diff --cached --quiet; then
       log "nothing staged after filtering"
@@ -81,10 +83,15 @@ tick() {
       in_repo commit -q -m "sandbox: auto-sync $(date -u +%Y-%m-%dT%H:%MZ)" 2>>"$LOG" \
         && log "committed $count change(s)"
     fi
-    if timeout 120 in_repo push -q "$REMOTE" "HEAD:$BRANCH" 2>>"$LOG"; then
-      log "pushed to $REMOTE/$BRANCH"
+  fi
+  # push only when we are actually ahead of the remote
+  local ahead
+  ahead="$(in_repo rev-list --count "$REMOTE/$BRANCH..HEAD" 2>/dev/null || echo 0)"
+  if [ "${ahead:-0}" -gt 0 ]; then
+    if timeout 120 git -C "$REPO" push -q "$REMOTE" "HEAD:$BRANCH" 2>>"$LOG"; then
+      log "pushed $ahead commit(s) to $REMOTE/$BRANCH"
     else
-      log "push rejected/failed - will rebase and retry next tick"
+      log "push rejected/failed - will pull --rebase and retry next tick"
     fi
   fi
 
@@ -92,7 +99,7 @@ tick() {
   local behind
   behind="$(in_repo rev-list --count "HEAD..$REMOTE/$BRANCH" 2>/dev/null || echo 0)"
   if [ "${behind:-0}" -gt 0 ]; then
-    if timeout 120 in_repo pull -q --rebase --autostash "$REMOTE" "$BRANCH" 2>>"$LOG"; then
+    if timeout 120 git -C "$REPO" pull -q --rebase --autostash "$REMOTE" "$BRANCH" 2>>"$LOG"; then
       log "pulled $behind remote commit(s)"
     else
       log "pull --rebase failed - manual attention needed"
@@ -105,7 +112,7 @@ tick() {
   local hs="$REPO/results/status/handshake.json"
   if [ -f "$hs" ] && command -v jq >/dev/null 2>&1; then
     local hsum
-    hsum="$(jq -c '{round, agent_state, local_state, local_updated}' "$hs" 2>/dev/null)"
+    hsum="$(jq -c '{round, arena_state, local_state, local_updated}' "$hs" 2>/dev/null)"
     [ -n "$hsum" ] && log "handshake: $hsum"
   fi
   local receipts
