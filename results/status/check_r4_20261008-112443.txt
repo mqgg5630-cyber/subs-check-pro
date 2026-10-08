@@ -1,0 +1,12 @@
+check round 4 on LAPTOP-R77M5D6M - passed (exit 0)
+cmd: powershell -NoProfile -ExecutionPolicy Bypass -File code/v2ray_subs/local_run.ps1
+elapsed: 294s
+
+subs-check-pro binary ready: v3.5.0 (route cached)
+config written, local ports 38678 and 29600
+subs-check-pro started, pid 38428
+check done: all.yaml=True base64=True minutes=4
+usable nodes: 10 (vmess 0, vless 8, trojan 0, ss 1)
+delivered files to Desktop\v2ray-subs-20261008-1128
+v2rayN: imported 53 nodes into the new group
+receipt: results/v2ray_subs/RECEIPT_20261008-112445.json state=ok

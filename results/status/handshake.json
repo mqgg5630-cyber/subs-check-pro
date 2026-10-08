@@ -1,9 +1,9 @@
 {
-  "round": 4,
-  "arena_state": "awaiting_check",
-  "local_state": "pending",
-  "arena_updated": "2026-10-08 03:24:24",
-  "local_updated": null,
-  "host": "",
-  "note": "round 4: run mode. Round 3 delivered the Desktop folder (9 nodes) but v2rayN was not found by the script. This round reports v2rayN process/path/database diagnostics and imports the group if v2rayN is running. No restart of v2rayN by the script, no active-node or system-proxy change."
+    "round":  4,
+    "arena_state":  "awaiting_check",
+    "local_state":  "passed",
+    "arena_updated":  "2026-10-08 03:24:24",
+    "local_updated":  "2026-10-08 11:29:37",
+    "host":  "LAPTOP-R77M5D6M",
+    "note":  "round 4: run mode. Round 3 delivered the Desktop folder (9 nodes) but v2rayN was not found by the script. This round reports v2rayN process/path/database diagnostics and imports the group if v2rayN is running. No restart of v2rayN by the script, no active-node or system-proxy change."
 }
