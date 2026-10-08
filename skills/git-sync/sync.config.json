@@ -1,0 +1,48 @@
+{
+  "branch": "arena/d2a66b2d-subs-check-pro",
+  "remote": "origin",
+  "download_dir": "",
+  "download_sets": {
+    "final": [
+      "deliverable"
+    ]
+  },
+  "upload_map": {
+    ".docx": "sources",
+    ".doc": "sources",
+    ".pptx": "sources",
+    ".ppt": "sources",
+    ".pdf": "sources",
+    ".md": "sources",
+    ".txt": "sources",
+    ".zip": "sources",
+    ".py": "code",
+    ".ipynb": "code",
+    ".xlsx": "results",
+    ".xls": "results",
+    ".csv": "results"
+  },
+  "gate": "bash code/check_all.sh",
+  "receipt": "results/sync/last_sync.md",
+  "receipt_history": "results/sync/history",
+  "hardware_dir": "results/hardware",
+  "handshake": "results/status/handshake.json",
+  "check_cmd": "powershell -NoProfile -ExecutionPolicy Bypass -File code/v2ray_subs/local_run.ps1",
+  "check_timeout_min": 60,
+  "lock_stale_min": 90,
+  "hands_free": true,
+  "auto_pull": true,
+  "auto_push": true,
+  "auto_push_prefix": "local: auto",
+  "auto_push_exclude": [
+    ".env",
+    ".env.*",
+    "**/*.pem",
+    "**/*.key",
+    "**/credentials*",
+    "**/*secret*",
+    "**/*token*"
+  ],
+  "success_criteria": "results/status/success_criteria.json",
+  "_note_v2ray": "check_cmd runs code/v2ray_subs/local_run.ps1 on the laptop. Mode comes from results/v2ray_subs/mode.txt (probe|run). Node lists never go into git: they stay on the laptop desktop folder. check_timeout_min raised to 60 for full subs-check-pro runs."
+}
