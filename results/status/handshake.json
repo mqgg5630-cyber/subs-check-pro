@@ -1,9 +1,9 @@
 {
-  "round": 5,
-  "arena_state": "accepted",
-  "local_state": "passed",
-  "arena_updated": "2026-10-08 03:36:54",
-  "local_updated": "2026-10-08 11:35:35",
-  "host": "LAPTOP-R77M5D6M",
-  "note": "round 5 refresh passed: 53 nodes in the Desktop folder, matches the v2rayN group count. Watcher can go idle."
+  "round": 6,
+  "arena_state": "awaiting_check",
+  "local_state": "pending",
+  "arena_updated": "2026-10-08 04:16:05",
+  "local_updated": null,
+  "host": "",
+  "note": "round 6: export the plain node list (user confirmed public push)"
 }
