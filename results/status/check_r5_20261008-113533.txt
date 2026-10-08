@@ -1,0 +1,6 @@
+check round 5 on LAPTOP-R77M5D6M - passed (exit 0)
+cmd: powershell -NoProfile -ExecutionPolicy Bypass -File code/v2ray_subs/local_run.ps1
+elapsed: 2s
+
+refresh: 53 share links (socks 43 / vless 8 / hysteria2 1 / ss 1)
+receipt: results/v2ray_subs/RECEIPT_20261008-113534.json state=ok
