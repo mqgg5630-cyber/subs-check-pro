@@ -9,7 +9,7 @@
     "https://raw.githubusercontent.com/sinspired/airport/main/subs/merged/scan.txt"
   ],
   "success_limit": 100,
-  "check_timeout_min": 45,
+  "check_timeout_min": 40,
   "desktop_folder_prefix": "v2ray-subs-",
   "group_name": "subs-check-pro可用节点-20261008",
   "v2rayn_import_wait_sec": 240

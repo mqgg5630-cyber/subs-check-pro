@@ -50,7 +50,7 @@ function Read-Settings {
 
 function Test-PortFree([int]$port) {
     try {
-        $l = New-Object System.Net.Sockets.TcpListener([System.Net.IPAddress]::Loopback, $port)
+        $l = [System.Net.Sockets.TcpListener]::new([System.Net.IPAddress]::Loopback, $port)
         $l.Start()
         $l.Stop()
         return $true
@@ -204,6 +204,7 @@ function Get-SafeTail([string]$path, [int]$n) {
 
 function Write-Receipt([System.Collections.IDictionary]$r) {
     $json = ($r | ConvertTo-Json -Depth 8)
+    if ($env:USERNAME) { $json = $json.Replace($env:USERNAME, '<user>') }
     $name = 'RECEIPT_' + $stamp + '.json'
     Write-Utf8 (Join-Path $outDir $name) ($json + "`n")
     Write-Utf8 (Join-Path $outDir 'RECEIPT_LATEST.json') ($json + "`n")
@@ -390,16 +391,17 @@ function Invoke-Run {
 
         # 7. README and manifest in the folder (counts and hashes only, no links)
         $tpl = [string](Get-Content -LiteralPath (Join-Path $repo 'code\v2ray_subs\desktop_readme.txt') -Raw -Encoding UTF8)
-        $txt = $tpl.Replace('{{generated_at}}', (Get-Date).ToString('yyyy-MM-dd HH:mm')).
-            Replace('{{version}}', [string]$st.subs_check_pro_version).
-            Replace('{{source_count}}', [string](@($st.sub_urls_remote).Count)).
-            Replace('{{total}}', [string]$nodes.Count).
-            Replace('{{vmess}}', [string]$cnt['vmess']).
-            Replace('{{vless}}', [string]$cnt['vless']).
-            Replace('{{trojan}}', [string]$cnt['trojan']).
-            Replace('{{ss}}', [string]$cnt['ss']).
-            Replace('{{other}}', [string]$cnt['other']).
-            Replace('{{import_line}}', $importLine)
+        $txt = $tpl
+        $txt = $txt.Replace('{{generated_at}}', (Get-Date).ToString('yyyy-MM-dd HH:mm'))
+        $txt = $txt.Replace('{{version}}', [string]$st.subs_check_pro_version)
+        $txt = $txt.Replace('{{source_count}}', [string](@($st.sub_urls_remote).Count))
+        $txt = $txt.Replace('{{total}}', [string]$nodes.Count)
+        $txt = $txt.Replace('{{vmess}}', [string]$cnt['vmess'])
+        $txt = $txt.Replace('{{vless}}', [string]$cnt['vless'])
+        $txt = $txt.Replace('{{trojan}}', [string]$cnt['trojan'])
+        $txt = $txt.Replace('{{ss}}', [string]$cnt['ss'])
+        $txt = $txt.Replace('{{other}}', [string]$cnt['other'])
+        $txt = $txt.Replace('{{import_line}}', $importLine)
         Write-Utf8 $fReadme $txt $true
         $files = @()
         foreach ($f in @($fSub, $fPlain, $fReadme)) {
@@ -441,4 +443,7 @@ switch ($Mode) {
     'run' { Invoke-Run }
     default { Say ('unknown mode: ' + $Mode); $script:exitCode = 1 }
 }
-Save-ReportAndExit
+if ($Mode -eq 'probe') {
+    Write-Utf8 (Join-Path $outDir ('probe_' + $stamp + '.txt')) (($script:report -join "`n") + "`n")
+}
+exit $script:exitCode

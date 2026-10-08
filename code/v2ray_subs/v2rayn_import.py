@@ -221,6 +221,7 @@ def main():
         try:
             sub_id, reused = upsert_group(con, a.group, url, sub_id, 1440)
             con.commit()
+            res["subitem_columns"] = columns(con, "SubItem")  # names only, for the receipt
         finally:
             con.close()
         created = not reused
