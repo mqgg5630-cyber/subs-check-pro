@@ -1,9 +1,9 @@
 {
-    "round":  3,
-    "arena_state":  "awaiting_check",
-    "local_state":  "failed",
-    "arena_updated":  "2026-10-08 03:17:30",
-    "local_updated":  "2026-10-08 11:22:04",
-    "host":  "LAPTOP-R77M5D6M",
-    "note":  "round 3: run mode retry after round-2 fixes. Round 2 finished the check in ~5 min but the script looked for output in the wrong folder (output\\sub is correct). Also fixes the download route list. Same guarantees: new Desktop folder, one new v2rayN group, no active-node or system-proxy change."
+  "round": 4,
+  "arena_state": "awaiting_check",
+  "local_state": "pending",
+  "arena_updated": "2026-10-08 03:24:24",
+  "local_updated": null,
+  "host": "",
+  "note": "round 4: run mode. Round 3 delivered the Desktop folder (9 nodes) but v2rayN was not found by the script. This round reports v2rayN process/path/database diagnostics and imports the group if v2rayN is running. No restart of v2rayN by the script, no active-node or system-proxy change."
 }
