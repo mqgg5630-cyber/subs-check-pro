@@ -1,9 +1,9 @@
 {
-    "round":  2,
-    "arena_state":  "awaiting_check",
-    "local_state":  "failed",
-    "arena_updated":  "2026-10-08 02:34:02",
-    "local_updated":  "2026-10-08 11:15:22",
-    "host":  "LAPTOP-R77M5D6M",
-    "note":  "round 2: run mode. subs-check-pro checks the default subscription sources; usable nodes go to a NEW Desktop folder; then ONE new v2rayN subscription group is added (no restart, no active-node or system-proxy change). Download falls back to the already-running v2rayN HTTP port only if direct GitHub access fails."
+  "round": 3,
+  "arena_state": "awaiting_check",
+  "local_state": "pending",
+  "arena_updated": "2026-10-08 03:17:30",
+  "local_updated": null,
+  "host": "",
+  "note": "round 3: run mode retry after round-2 fixes. Round 2 finished the check in ~5 min but the script looked for output in the wrong folder (output\\sub is correct). Also fixes the download route list. Same guarantees: new Desktop folder, one new v2rayN group, no active-node or system-proxy change."
 }
