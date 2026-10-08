@@ -7,12 +7,13 @@
 #           V2Ray nodes go to a NEW Desktop folder, then ONE new subscription
 #           group is added to v2rayN. v2rayN is not restarted, the active node
 #           and the system proxy are not changed.
-# Exit 0 = passed. Anything else = failed (receipt says why).
+# Exit 0 = passed. Anything else = failed (the receipt says at which stage).
 # Node links never go to git: they stay in the Desktop folder.
 # Keep this file ASCII-only: Windows PowerShell 5.1 reads .ps1 as ANSI.
 param([string]$Mode = '')
 
 $ErrorActionPreference = 'Continue'
+$ProgressPreference = 'SilentlyContinue'
 $repo = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..\..')).Path
 Set-Location -LiteralPath $repo
 
@@ -59,6 +60,19 @@ function Test-PortFree([int]$port) {
     }
 }
 
+function Test-TcpOpen([string]$hostName, [int]$port) {
+    $c = [System.Net.Sockets.TcpClient]::new()
+    try {
+        $t = $c.ConnectAsync($hostName, $port)
+        $ok = $t.Wait(2000)
+        return ($ok -and $c.Connected)
+    } catch {
+        return $false
+    } finally {
+        $c.Close()
+    }
+}
+
 function Get-FreePorts([int]$count) {
     $found = @()
     $guard = 0
@@ -84,45 +98,6 @@ function Test-Url([string]$u) {
     }
 }
 
-# ---------------------------------------------------------------- probe mode
-function Invoke-Probe {
-    $script:exitCode = 0
-    Say ('probe ' + $stamp)
-    Say ('os: ' + [Environment]::OSVersion.VersionString + ' | ps: ' + $PSVersionTable.PSVersion)
-    Say ('desktop folder exists: ' + (Test-Path -LiteralPath ([Environment]::GetFolderPath('Desktop'))))
-    Say ('LOCALAPPDATA set: ' + [bool]$env:LOCALAPPDATA)
-
-    $roots = @($env:LOCALAPPDATA, (Join-Path $env:LOCALAPPDATA 'Programs'), $env:ProgramFiles, 'D:\', 'E:\', 'F:\', (Join-Path $env:USERPROFILE 'Desktop'), (Join-Path $env:USERPROFILE 'Downloads'))
-    $hits = New-Object System.Collections.ArrayList
-    foreach ($root in $roots) {
-        if (-not $root -or -not (Test-Path -LiteralPath $root)) { continue }
-        Get-ChildItem -LiteralPath $root -Directory -ErrorAction SilentlyContinue | Where-Object { $_.Name -like 'v2rayN*' } | ForEach-Object {
-            $db = Join-Path $_.FullName 'guiConfigs\guiNDB.db'
-            $exe = Test-Path -LiteralPath (Join-Path $_.FullName 'v2rayN.exe')
-            [void]$hits.Add(('v2rayN dir found (exe=' + $exe + ', guiNDB.db=' + (Test-Path -LiteralPath $db) + '): ' + $_.Name))
-        }
-    }
-    if ($hits.Count -eq 0) { Say 'v2rayN dir: none found in standard locations' } else { foreach ($h in $hits) { Say $h } }
-    $v2proc = @(Get-Process -Name 'v2rayN' -ErrorAction SilentlyContinue)
-    Say ('v2rayN process count: ' + $v2proc.Count)
-
-    $py = Find-Python
-    if ($py) { Say ('python 3: ' + $py.exe + ' ' + ($py.pre -join ' ')) } else { Say 'python 3: not found' }
-
-    foreach ($p in @(8199, 8299)) { Say ('port ' + $p + ' free: ' + (Test-PortFree $p)) }
-    $dyn = Get-FreePorts 2
-    Say ('dynamic ports sample: ' + ($dyn -join ', '))
-
-    $st = Read-Settings
-    Say ('github release page: ' + (Test-Url ([string]$st.release_base)))
-    Say ('raw.githubusercontent index: ' + (Test-Url ([string]$st.sub_urls_remote[0])))
-
-    $tasks = @(Get-ScheduledTask -TaskName 'git-sync-watch-*' -ErrorAction SilentlyContinue)
-    Say ('git-sync watcher tasks: ' + $tasks.Count)
-    foreach ($t in $tasks) { Say ('  ' + $t.TaskName + ' state=' + $t.State) }
-}
-
-# ----------------------------------------------------------------- run mode
 function Find-Python {
     $cands = @(
         @{ exe = 'py'; pre = @('-3') },
@@ -161,30 +136,93 @@ function Find-V2rayN {
     return $null
 }
 
+function Get-DownloadRoutes {
+    # Route 1 is direct (uses the Windows proxy setting if one exists).
+    # Routes 2+ go through the HTTP inbound of an already-running v2rayN, for
+    # this download only. The active node and the system proxy are not changed.
+    $list = New-Object System.Collections.ArrayList
+    [void]$list.Add(@{ name = 'direct'; proxy = '' })
+    foreach ($port in @(10809, 10808)) {
+        if (Test-TcpOpen '127.0.0.1' $port) {
+            [void]$list.Add(@{ name = ('v2rayN-local-' + $port); proxy = ('http://127.0.0.1:' + $port) })
+        }
+    }
+    return ,($list.ToArray())
+}
+
+function Save-Remote([string]$uri, [string]$outFile, [string]$proxyUrl, [int]$timeoutSec) {
+    if (Test-Path -LiteralPath $outFile) { Remove-Item -LiteralPath $outFile -Force }
+    if ($proxyUrl) {
+        Invoke-WebRequest -Uri $uri -OutFile $outFile -UseBasicParsing -TimeoutSec $timeoutSec -Proxy $proxyUrl | Out-Null
+    } else {
+        Invoke-WebRequest -Uri $uri -OutFile $outFile -UseBasicParsing -TimeoutSec $timeoutSec | Out-Null
+    }
+    if (-not (Test-Path -LiteralPath $outFile) -or (Get-Item -LiteralPath $outFile).Length -eq 0) {
+        throw 'empty download'
+    }
+}
+
 function Get-SubsCheckExe([object]$st, [string]$work) {
     $ver = [string]$st.subs_check_pro_version
     $bin = Join-Path $work ('bin\' + $ver)
     $have = @(Get-ChildItem -LiteralPath $bin -Recurse -Filter 'subs-check-pro*.exe' -ErrorAction SilentlyContinue)
-    if ($have.Count -gt 0) { return $have[0].FullName }
-
+    if ($have.Count -gt 0) {
+        $script:downloadInfo['route'] = 'cached'
+        return $have[0].FullName
+    }
     New-Item -ItemType Directory -Force -Path $bin | Out-Null
     $dl = Join-Path $work 'download'
     New-Item -ItemType Directory -Force -Path $dl | Out-Null
     try { [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12 } catch { }
+
     $asset = [string]$st.windows_asset
-    $zip = Join-Path $dl $asset
-    $sums = Join-Path $dl ([string]$st.checksums_asset)
-    Invoke-WebRequest -Uri ([string]$st.release_base + $asset) -OutFile $zip -UseBasicParsing -TimeoutSec 900
-    Invoke-WebRequest -Uri ([string]$st.release_base + [string]$st.checksums_asset) -OutFile $sums -UseBasicParsing -TimeoutSec 120
+    $sumsName = [string]$st.checksums_asset
+    $sumsPath = Join-Path $dl $sumsName
+    $zipPath = Join-Path $dl $asset
+    $sumsUrl = [string]$st.release_base + $sumsName
+    $zipUrl = [string]$st.release_base + $asset
+
+    # the small checksum file picks the first route that can reach the release
+    $routes = @(Get-DownloadRoutes)
+    $good = $null
+    foreach ($route in $routes) {
+        try {
+            Save-Remote $sumsUrl $sumsPath ([string]$route.proxy) 120
+            $good = $route
+            break
+        } catch {
+            $script:downloadInfo['attempts'] += ([string]$route.name + ' checksums: ' + $_.Exception.GetType().Name)
+        }
+    }
+    if ($null -eq $good) { throw 'no download route reached the release checksums' }
+
+    $order = New-Object System.Collections.ArrayList
+    [void]$order.Add($good)
+    foreach ($route in $routes) {
+        if ($route.name -ne $good.name) { [void]$order.Add($route) }
+    }
+    $zipOk = $false
+    foreach ($route in $order) {
+        try {
+            Save-Remote $zipUrl $zipPath ([string]$route.proxy) 900
+            $script:downloadInfo['route'] = [string]$route.name
+            $zipOk = $true
+            break
+        } catch {
+            $script:downloadInfo['attempts'] += ([string]$route.name + ' binary: ' + $_.Exception.GetType().Name)
+        }
+    }
+    if (-not $zipOk) { throw 'binary download failed on every route' }
+
     $want = ''
-    foreach ($line in (Get-Content -LiteralPath $sums)) {
+    foreach ($line in (Get-Content -LiteralPath $sumsPath)) {
         $parts = @($line.Trim() -split '\s+')
         if ($parts.Count -ge 2 -and $parts[$parts.Count - 1] -eq $asset) { $want = $parts[0].ToLower() }
     }
     if (-not $want) { throw 'checksum line for the Windows asset was not found' }
-    $got = (Get-FileHash -LiteralPath $zip -Algorithm SHA256).Hash.ToLower()
+    $got = (Get-FileHash -LiteralPath $zipPath -Algorithm SHA256).Hash.ToLower()
     if ($got -ne $want) { throw ('sha256 mismatch for ' + $asset) }
-    Expand-Archive -LiteralPath $zip -DestinationPath $bin -Force
+    Expand-Archive -LiteralPath $zipPath -DestinationPath $bin -Force
     $exe = @(Get-ChildItem -LiteralPath $bin -Recurse -Filter 'subs-check-pro*.exe' | Select-Object -First 1)
     if ($exe.Count -eq 0) { throw 'subs-check-pro exe not found after extract' }
     return $exe[0].FullName
@@ -211,8 +249,48 @@ function Write-Receipt([System.Collections.IDictionary]$r) {
     return $name
 }
 
+# ---------------------------------------------------------------- probe mode
+function Invoke-Probe {
+    $script:exitCode = 0
+    Say ('probe ' + $stamp)
+    Say ('os: ' + [Environment]::OSVersion.VersionString + ' | ps: ' + $PSVersionTable.PSVersion)
+    Say ('desktop folder exists: ' + (Test-Path -LiteralPath ([Environment]::GetFolderPath('Desktop'))))
+    Say ('LOCALAPPDATA set: ' + [bool]$env:LOCALAPPDATA)
+
+    $roots = @($env:LOCALAPPDATA, (Join-Path $env:LOCALAPPDATA 'Programs'), $env:ProgramFiles, 'D:\', 'E:\', 'F:\', (Join-Path $env:USERPROFILE 'Desktop'), (Join-Path $env:USERPROFILE 'Downloads'))
+    $hits = New-Object System.Collections.ArrayList
+    foreach ($root in $roots) {
+        if (-not $root -or -not (Test-Path -LiteralPath $root)) { continue }
+        Get-ChildItem -LiteralPath $root -Directory -ErrorAction SilentlyContinue | Where-Object { $_.Name -like 'v2rayN*' } | ForEach-Object {
+            $db = Join-Path $_.FullName 'guiConfigs\guiNDB.db'
+            $exeHere = Test-Path -LiteralPath (Join-Path $_.FullName 'v2rayN.exe')
+            [void]$hits.Add(('v2rayN dir found (exe=' + $exeHere + ', guiNDB.db=' + (Test-Path -LiteralPath $db) + '): ' + $_.Name))
+        }
+    }
+    if ($hits.Count -eq 0) { Say 'v2rayN dir: none found in standard locations' } else { foreach ($h in $hits) { Say $h } }
+    $v2proc = @(Get-Process -Name 'v2rayN' -ErrorAction SilentlyContinue)
+    Say ('v2rayN process count: ' + $v2proc.Count)
+
+    $py = Find-Python
+    if ($py) { Say ('python 3: ' + $py.exe + ' ' + ($py.pre -join ' ')) } else { Say 'python 3: not found' }
+
+    foreach ($p in @(8199, 8299)) { Say ('port ' + $p + ' free: ' + (Test-PortFree $p)) }
+    $dyn = Get-FreePorts 2
+    Say ('dynamic ports sample: ' + ($dyn -join ', '))
+
+    $st = Read-Settings
+    Say ('github release page: ' + (Test-Url ([string]$st.release_base)))
+    Say ('raw.githubusercontent index: ' + (Test-Url ([string]$st.sub_urls_remote[0])))
+
+    $tasks = @(Get-ScheduledTask -TaskName 'git-sync-watch-*' -ErrorAction SilentlyContinue)
+    Say ('git-sync watcher tasks: ' + $tasks.Count)
+    foreach ($t in $tasks) { Say ('  ' + $t.TaskName + ' state=' + $t.State) }
+}
+
+# ----------------------------------------------------------------- run mode
 function Invoke-Run {
     $script:exitCode = 2
+    $script:downloadInfo = @{ route = ''; attempts = @() }
     $st = Read-Settings
     $work = Join-Path $env:LOCALAPPDATA 'subs-check-pro-d2a66b2d'
     foreach ($d in @('bin', 'download', 'logs', 'output', 'backup')) {
@@ -226,6 +304,7 @@ function Invoke-Run {
         stage = 'start'
         delivered = $false
         imported = $false
+        download = $script:downloadInfo
     }
     $proc = $null
     try {
@@ -233,7 +312,7 @@ function Invoke-Run {
         $r['stage'] = 'download'
         $exe = Get-SubsCheckExe $st $work
         $r['subs_check_pro_version'] = [string]$st.subs_check_pro_version
-        Say ('subs-check-pro binary ready: ' + $r['subs_check_pro_version'])
+        Say ('subs-check-pro binary ready: ' + $r['subs_check_pro_version'] + ' (route ' + $script:downloadInfo['route'] + ')')
 
         # 2. config: ports chosen free at run time, never 8199/8299
         $r['stage'] = 'config'
@@ -341,18 +420,20 @@ function Invoke-Run {
         # 6. import: ONE new subscription group in v2rayN
         $r['stage'] = 'import'
         $v = Find-V2rayN
-        $imp = @{ found = ($v -ne $null); running = $false; group = [string]$st.group_name; ok = $false }
+        $imp = @{ found = ($null -ne $v); running = $false; group = [string]$st.group_name; ok = $false }
         $importLine = ''
-        if ($v -eq $null) {
+        if ($null -eq $v) {
             $imp['error'] = 'v2rayN not found'
             $importLine = 'v2rayN was not found on this computer, so nothing was imported.'
         } elseif (-not $v.running) {
+            $imp['dir_name'] = Split-Path -Leaf $v.dir
             $imp['error'] = 'v2rayN not running'
             $importLine = 'v2rayN is not running, so nothing was imported. Start v2rayN and request the import again.'
         } else {
             $imp['running'] = $true
+            $imp['dir_name'] = Split-Path -Leaf $v.dir
             $py = Find-Python
-            if ($py -eq $null) {
+            if ($null -eq $py) {
                 $imp['error'] = 'python 3 not found'
                 $importLine = 'Python 3 was not found, so nothing was imported.'
             } else {
@@ -373,6 +454,7 @@ function Invoke-Run {
                     $imp['reused_group'] = $res.reused_group
                     $imp['auto_update'] = $res.auto_update
                     $imp['backup'] = $res.backup
+                    $imp['subitem_columns'] = $res.subitem_columns
                     if ($res.error) { $imp['error'] = [string]$res.error }
                 } else {
                     $imp['error'] = 'import helper produced no result'
@@ -387,7 +469,11 @@ function Invoke-Run {
         if (-not $importLine) { $importLine = 'v2rayN: added subscription group "' + [string]$st.group_name + '".' }
         $r['imported'] = [bool]$imp['ok']
         $r['v2rayn'] = $imp
-        Say ('v2rayN: ' + $(if ($imp['ok']) { 'imported ' + [string]$imp['profiles'] + ' nodes' } else { 'NOT imported (' + [string]$imp['error'] + ')' }))
+        if ($imp['ok']) {
+            Say ('v2rayN: imported ' + [string]$imp['profiles'] + ' nodes into the new group')
+        } else {
+            Say ('v2rayN: NOT imported (' + [string]$imp['error'] + ')')
+        }
 
         # 7. README and manifest in the folder (counts and hashes only, no links)
         $tpl = [string](Get-Content -LiteralPath (Join-Path $repo 'code\v2ray_subs\desktop_readme.txt') -Raw -Encoding UTF8)
@@ -429,7 +515,7 @@ function Invoke-Run {
         Say ('FAILED at stage ' + $r['stage'] + ': ' + $r['error'])
         $script:exitCode = 2
     } finally {
-        if ($proc -ne $null -and -not $proc.HasExited) {
+        if ($null -ne $proc -and -not $proc.HasExited) {
             & cmd.exe /d /c ('taskkill /PID ' + $proc.Id + ' /T /F') | Out-Null
         }
     }
