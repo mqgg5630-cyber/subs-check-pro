@@ -1,0 +1,12 @@
+check round 3 on LAPTOP-R77M5D6M - failed (exit 2)
+cmd: powershell -NoProfile -ExecutionPolicy Bypass -File code/v2ray_subs/local_run.ps1
+elapsed: 269s
+
+subs-check-pro binary ready: v3.5.0 (route cached)
+config written, local ports 20505 and 59066
+subs-check-pro started, pid 32720
+check done: all.yaml=True base64=True minutes=4
+usable nodes: 9 (vmess 0, vless 8, trojan 0, ss 0)
+delivered files to Desktop\v2ray-subs-20261008-1122
+v2rayN: NOT imported (v2rayN not found)
+receipt: results/v2ray_subs/RECEIPT_20261008-111736.json state=delivered_not_imported
