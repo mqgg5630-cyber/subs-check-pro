@@ -1,0 +1,10 @@
+check round 2 on LAPTOP-R77M5D6M - failed (exit 2)
+cmd: powershell -NoProfile -ExecutionPolicy Bypass -File code/v2ray_subs/local_run.ps1
+elapsed: 2425s
+
+subs-check-pro binary ready: v3.5.0 (route direct v2rayN-local-10808)
+config written, local ports 38603 and 57863
+subs-check-pro started, pid 22584
+check done: all.yaml=False base64=False minutes=40
+FAILED at stage check: no base64 subscription was produced (check or sub-store did not finish)
+receipt: results/v2ray_subs/RECEIPT_20261008-103459.json state=failed

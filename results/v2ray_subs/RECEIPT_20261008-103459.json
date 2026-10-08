@@ -1,0 +1,32 @@
+{
+    "started":  "2026-10-08 10:34:59",
+    "stage":  "check",
+    "state":  "failed",
+    "log_tail":  [
+                     "\u001b[2m10-08 10:39:24\u001b[0m \u001b[92mINF\u001b[0m 消耗流量统计 \u001b[2m总计=\u001b[0m\"23.34 MB\" \u001b[2m订阅=\u001b[0m\"22.36 MB\" \u001b[2m检测=\u001b[0m\"1007.68 KB\"",
+                     "\u001b[2m10-08 10:39:24\u001b[0m \u001b[92mINF\u001b[0m 检测完成",
+                     "\u001b[2m10-08 10:39:25\u001b[0m \u001b[92mINF\u001b[0m Sub-Store 订阅已同步 \u001b[2mname=\u001b[0msub",
+                     "\u001b[2m10-08 10:39:25\u001b[0m \u001b[92mINF\u001b[0m Sub-Store 订阅已创建 \u001b[2mname=\u001b[0mmihomo",
+                     "\u001b[2m10-08 10:39:25\u001b[0m \u001b[92mINF\u001b[0m Sub-Store 订阅已创建 \u001b[2mname=\u001b[0msingbox-1.14",
+                     "\u001b[2m10-08 10:39:25\u001b[0m \u001b[92mINF\u001b[0m Sub-Store 订阅已创建 \u001b[2mname=\u001b[0msingbox-1.15-pre",
+                     "\u001b[2m10-08 10:39:25\u001b[0m \u001b[92mINF\u001b[0m Sub-Store 同步完成",
+                     "\u001b[2m10-08 10:39:25\u001b[0m \u001b[92mINF\u001b[0m 保存本地成功 \u001b[2m路径=\u001b[0mC:\\Users\\<user>\\AppData\\Local\\subs-check-pro-d2a66b2d\\output\\sub\\all.yaml",
+                     "\u001b[2m10-08 10:39:26\u001b[0m \u001b[93mWRN\u001b[0m 远程获取 mihomo 失败，回退到本地生成 \u001b[2merr=\u001b[0m\u003cnil\u003e \u001b[2mstatus=\u001b[0m500",
+                     "\u001b[2m10-08 10:39:26\u001b[0m \u001b[92mINF\u001b[0m 保存本地成功 \u001b[2m路径=\u001b[0mC:\\Users\\<user>\\AppData\\Local\\subs-check-pro-d2a66b2d\\output\\sub\\mihomo.yaml",
+                     "\u001b[2m10-08 10:39:26\u001b[0m \u001b[92mINF\u001b[0m 保存本地成功 \u001b[2m路径=\u001b[0mC:\\Users\\<user>\\AppData\\Local\\subs-check-pro-d2a66b2d\\output\\sub\\base64.txt",
+                     "\u001b[2m10-08 10:39:26\u001b[0m \u001b[92mINF\u001b[0m 下次检测时间 \u001b[2mtime=\u001b[0m\"2026-12-16 21:19:26 UTC+8\""
+                 ],
+    "delivered":  false,
+    "finished":  "2026-10-08 11:15:22",
+    "error":  "no base64 subscription was produced (check or sub-store did not finish)",
+    "mode":  "run",
+    "imported":  false,
+    "stamp":  "20261008-103459",
+    "subs_check_pro_version":  "v3.5.0",
+    "download":  {
+                     "attempts":  [
+                                      "direct v2rayN-local-10808 binary: IOException"
+                                  ],
+                     "route":  "direct v2rayN-local-10808"
+                 }
+}
