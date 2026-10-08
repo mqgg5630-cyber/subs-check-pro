@@ -1,10 +1,39 @@
 {
-    "mode":  "export",
+    "started":  "2026-10-08 11:35:35",
+    "stage":  "write",
+    "state":  "ok",
+    "matches_v2rayn_count":  true,
+    "delivered":  true,
     "folder":  "Desktop\\v2ray-subs-20261008-1128",
-    "error":  "a line is not a share link, export refused",
-    "started":  "2026-10-08 12:17:23",
-    "state":  "failed",
-    "finished":  "2026-10-08 12:17:24",
-    "stamp":  "20261008-121723",
-    "stage":  "validate"
+    "files":  [
+                  {
+                      "sha256":  "c30d1bd66b133e0973ad404c0b107bf921033f2b6e55f42fee040a0293d638ed",
+                      "name":  "v2ray_subscription_base64.txt",
+                      "bytes":  7024
+                  },
+                  {
+                      "sha256":  "009eb23b4eb263874650706098eb47b046956f4a44432681989137b957be0d1a",
+                      "name":  "v2ray_nodes_plain.txt",
+                      "bytes":  5221
+                  },
+                  {
+                      "sha256":  "c96e94a3f06180fcf1ec7a4d5a4061f814e507feff79d4ca17b131f9e60c8c6c",
+                      "name":  "README.txt",
+                      "bytes":  1119
+                  }
+              ],
+    "mode":  "refresh",
+    "imported":  true,
+    "node_counts":  {
+                        "total":  53,
+                        "by_scheme":  {
+                                          "vless":  8,
+                                          "hysteria2":  1,
+                                          "ss":  1,
+                                          "socks":  43
+                                      }
+                    },
+    "stamp":  "20261008-113534",
+    "finished":  "2026-10-08 11:35:35",
+    "v2rayn_profiles":  53
 }

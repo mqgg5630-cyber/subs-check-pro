@@ -673,12 +673,16 @@ function Invoke-Export {
 
         $r['stage'] = 'validate'
         $text = [System.IO.File]::ReadAllText($src, [System.Text.Encoding]::UTF8)
-        $lines = @($text -split "`r?`n" | ForEach-Object { $_.Trim() } | Where-Object { $_ -ne '' })
+        $lines = @($text -split "`r?`n" | ForEach-Object { $_.Trim().TrimStart([char[]]@([char]0xFEFF, [char]0x200B)).Trim() } | Where-Object { $_ -ne '' })
         if ($lines.Count -eq 0) { throw 'the plain node list is empty' }
         $hist = @{}
-        foreach ($ln in $lines) {
-            if ($ln -notmatch '^[A-Za-z][A-Za-z0-9+.-]*://\S+$') { throw 'a line is not a share link, export refused' }
+        for ($i = 0; $i -lt $lines.Count; $i++) {
+            $ln = [string]$lines[$i]
+            # Same rule as the refresh mode: each line starts with scheme:// (node names may contain spaces).
+            # Only the line number is reported, never the line itself.
+            if ($ln -notmatch '^[A-Za-z][A-Za-z0-9+.-]*://\S') { throw ('line ' + ($i + 1) + ' does not start with scheme://, export refused') }
             $sch = (($ln -split '://', 2)[0]).ToLower()
+            if ($sch -eq 'http' -or $sch -eq 'https') { throw ('line ' + ($i + 1) + ' is a web link, export refused') }
             if ($hist.ContainsKey($sch)) { $hist[$sch] = [int]$hist[$sch] + 1 } else { $hist[$sch] = 1 }
         }
         $breakdown = Get-Breakdown $hist
