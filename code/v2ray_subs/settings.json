@@ -1,0 +1,16 @@
+{
+  "subs_check_pro_version": "v3.5.0",
+  "release_base": "https://github.com/sinspired/subs-check-pro/releases/download/v3.5.0/",
+  "windows_asset": "subs-check-pro_Windows_x86_64.zip",
+  "checksums_asset": "subs-check-pro_3.5.0_checksums.txt",
+  "sub_urls_remote": [
+    "https://raw.githubusercontent.com/sinspired/airport/main/subs/merged/col.txt",
+    "https://raw.githubusercontent.com/sinspired/airport/main/subs/merged/cm.txt",
+    "https://raw.githubusercontent.com/sinspired/airport/main/subs/merged/scan.txt"
+  ],
+  "success_limit": 100,
+  "check_timeout_min": 45,
+  "desktop_folder_prefix": "v2ray-subs-",
+  "group_name": "subs-check-pro可用节点-20261008",
+  "v2rayn_import_wait_sec": 240
+}
