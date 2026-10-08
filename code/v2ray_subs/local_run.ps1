@@ -116,30 +116,59 @@ function Find-Python {
     return $null
 }
 
+function Get-V2rayNCandidates {
+    # Folder names starting with v2rayN, searched 2 levels deep in the usual places
+    # (drive roots: 1 level). Returns full paths (names only are printed).
+    $dirs = New-Object System.Collections.ArrayList
+    $deep = @($env:LOCALAPPDATA, (Join-Path $env:LOCALAPPDATA 'Programs'), $env:ProgramFiles, (Join-Path $env:USERPROFILE 'Desktop'), (Join-Path $env:USERPROFILE 'Downloads'), (Join-Path $env:USERPROFILE 'Documents'))
+    foreach ($root in $deep) {
+        if (-not $root -or -not (Test-Path -LiteralPath $root)) { continue }
+        $hit = @(Get-ChildItem -LiteralPath $root -Directory -Recurse -Depth 2 -ErrorAction SilentlyContinue | Where-Object { $_.Name -like 'v2rayN*' })
+        foreach ($h in $hit) { [void]$dirs.Add($h.FullName) }
+    }
+    foreach ($root in @('D:\', 'E:\', 'F:\')) {
+        if (-not (Test-Path -LiteralPath $root)) { continue }
+        $hit = @(Get-ChildItem -LiteralPath $root -Directory -Recurse -Depth 1 -ErrorAction SilentlyContinue | Where-Object { $_.Name -like 'v2rayN*' })
+        foreach ($h in $hit) { [void]$dirs.Add($h.FullName) }
+    }
+    return $dirs.ToArray()
+}
+
 function Find-V2rayN {
     $procs = @(Get-Process -Name 'v2rayN' -ErrorAction SilentlyContinue)
-    $dirs = New-Object System.Collections.ArrayList
+    $procDirs = New-Object System.Collections.ArrayList
+    $unreadable = 0
     foreach ($p in $procs) {
-        try { if ($p.Path) { [void]$dirs.Add((Split-Path -Parent $p.Path)) } } catch { }
+        $pp = ''
+        try { $pp = [string]$p.Path } catch { $pp = '' }
+        if ($pp) { [void]$procDirs.Add((Split-Path -Parent $pp)) } else { $unreadable++ }
     }
-    $procDirs = @($dirs | Select-Object -Unique)
-    $roots = @($env:LOCALAPPDATA, (Join-Path $env:LOCALAPPDATA 'Programs'), $env:ProgramFiles, 'D:\', 'E:\', 'F:\', (Join-Path $env:USERPROFILE 'Desktop'), (Join-Path $env:USERPROFILE 'Downloads'))
-    foreach ($root in $roots) {
-        if (-not $root -or -not (Test-Path -LiteralPath $root)) { continue }
-        Get-ChildItem -LiteralPath $root -Directory -ErrorAction SilentlyContinue | Where-Object { $_.Name -like 'v2rayN*' } | ForEach-Object { [void]$dirs.Add($_.FullName) }
+    if ($procDirs.Count -eq 0 -and $procs.Count -gt 0) {
+        try {
+            $cims = @(Get-CimInstance -ClassName Win32_Process -Filter "Name = 'v2rayN.exe'" -ErrorAction Stop)
+            foreach ($c in $cims) {
+                if ($c.ExecutablePath) { [void]$procDirs.Add((Split-Path -Parent ([string]$c.ExecutablePath))) }
+            }
+        } catch { }
     }
-    $all = @($dirs | Select-Object -Unique)
+    $cand = New-Object System.Collections.ArrayList
+    foreach ($d in $procDirs) { [void]$cand.Add($d) }
+    foreach ($d in @(Get-V2rayNCandidates)) { [void]$cand.Add($d) }
+    $all = @($cand | Select-Object -Unique)
+    $running = ($procs.Count -gt 0)
     foreach ($d in $all) {
         $db = Join-Path $d 'guiConfigs\guiNDB.db'
         if (Test-Path -LiteralPath $db) {
-            return [pscustomobject]@{ dir = $d; db = $db; running = ($procs.Count -gt 0); hasDb = $true }
+            return [pscustomobject]@{ dir = $d; db = $db; running = $running; hasDb = $true; procCount = $procs.Count; unreadable = $unreadable }
         }
     }
+    $d0 = ''
+    $db0 = ''
     if ($procDirs.Count -gt 0) {
         $d0 = [string]$procDirs[0]
-        return [pscustomobject]@{ dir = $d0; db = (Join-Path $d0 'guiConfigs\guiNDB.db'); running = ($procs.Count -gt 0); hasDb = $false }
+        $db0 = Join-Path $d0 'guiConfigs\guiNDB.db'
     }
-    return $null
+    return [pscustomobject]@{ dir = $d0; db = $db0; running = $running; hasDb = $false; procCount = $procs.Count; unreadable = $unreadable }
 }
 
 function Get-DownloadRoutes {
@@ -263,19 +292,15 @@ function Invoke-Probe {
     Say ('desktop folder exists: ' + (Test-Path -LiteralPath ([Environment]::GetFolderPath('Desktop'))))
     Say ('LOCALAPPDATA set: ' + [bool]$env:LOCALAPPDATA)
 
-    $roots = @($env:LOCALAPPDATA, (Join-Path $env:LOCALAPPDATA 'Programs'), $env:ProgramFiles, 'D:\', 'E:\', 'F:\', (Join-Path $env:USERPROFILE 'Desktop'), (Join-Path $env:USERPROFILE 'Downloads'))
-    $hits = New-Object System.Collections.ArrayList
-    foreach ($root in $roots) {
-        if (-not $root -or -not (Test-Path -LiteralPath $root)) { continue }
-        Get-ChildItem -LiteralPath $root -Directory -ErrorAction SilentlyContinue | Where-Object { $_.Name -like 'v2rayN*' } | ForEach-Object {
-            $db = Join-Path $_.FullName 'guiConfigs\guiNDB.db'
-            $exeHere = Test-Path -LiteralPath (Join-Path $_.FullName 'v2rayN.exe')
-            [void]$hits.Add(('v2rayN dir found (exe=' + $exeHere + ', guiNDB.db=' + (Test-Path -LiteralPath $db) + '): ' + $_.Name))
-        }
+    $v = Find-V2rayN
+    $vdir = '-'
+    if ($v.dir) { $vdir = Split-Path -Leaf $v.dir }
+    Say ('v2rayN: processes=' + $v.procCount + ' pathUnreadable=' + $v.unreadable + ' guiNDB.db=' + $v.hasDb + ' dir=' + $vdir)
+    foreach ($d in @(Get-V2rayNCandidates)) {
+        $exeHere = Test-Path -LiteralPath (Join-Path $d 'v2rayN.exe')
+        $dbHere = Test-Path -LiteralPath (Join-Path $d 'guiConfigs\guiNDB.db')
+        Say ('  candidate folder ' + (Split-Path -Leaf $d) + ': exe=' + $exeHere + ' guiNDB.db=' + $dbHere)
     }
-    if ($hits.Count -eq 0) { Say 'v2rayN dir: none found in standard locations' } else { foreach ($h in $hits) { Say $h } }
-    $v2proc = @(Get-Process -Name 'v2rayN' -ErrorAction SilentlyContinue)
-    Say ('v2rayN process count: ' + $v2proc.Count)
 
     $py = Find-Python
     if ($py) { Say ('python 3: ' + $py.exe + ' ' + ($py.pre -join ' ')) } else { Say 'python 3: not found' }
@@ -427,23 +452,16 @@ function Invoke-Run {
         # 6. import: ONE new subscription group in v2rayN
         $r['stage'] = 'import'
         $v = Find-V2rayN
-        $imp = @{ found = ($null -ne $v); running = $false; group = [string]$st.group_name; ok = $false }
+        $imp = @{ found = [bool]$v.hasDb; running = ($v.procCount -gt 0); procCount = $v.procCount; pathUnreadable = $v.unreadable; group = [string]$st.group_name; ok = $false }
+        if ($v.dir) { $imp['dir_name'] = Split-Path -Leaf $v.dir }
         $importLine = ''
-        if ($null -eq $v) {
-            $imp['error'] = 'v2rayN not found'
-            $importLine = 'v2rayN was not found on this computer, so nothing was imported.'
-        } elseif (-not $v.running) {
-            $imp['dir_name'] = Split-Path -Leaf $v.dir
-            $imp['error'] = 'v2rayN not running'
+        if ($v.procCount -eq 0) {
+            $imp['error'] = 'v2rayN is not running'
             $importLine = 'v2rayN is not running, so nothing was imported. Start v2rayN and request the import again.'
         } elseif (-not $v.hasDb) {
-            $imp['running'] = $true
-            $imp['dir_name'] = Split-Path -Leaf $v.dir
-            $imp['error'] = 'guiNDB.db not found next to v2rayN.exe'
+            $imp['error'] = 'guiNDB.db not found next to the running v2rayN'
             $importLine = 'The v2rayN database was not found where expected, so nothing was imported.'
         } else {
-            $imp['running'] = $true
-            $imp['dir_name'] = Split-Path -Leaf $v.dir
             $py = Find-Python
             if ($null -eq $py) {
                 $imp['error'] = 'python 3 not found'
@@ -473,7 +491,7 @@ function Invoke-Run {
                 }
                 if ($imp['ok']) {
                     $importLine = 'v2rayN: added subscription group "' + [string]$st.group_name + '" with ' + [string]$imp['profiles'] + ' node(s). The active node and the system proxy were not changed.'
-                } elseif (-not $importLine) {
+                } else {
                     $importLine = 'v2rayN import did not complete (' + [string]$imp['error'] + '). The database backup is in the work folder.'
                 }
             }
