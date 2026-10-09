@@ -1,0 +1,21 @@
+check round 9 on LAPTOP-R77M5D6M - passed (exit 0)
+cmd: powershell -NoProfile -ExecutionPolicy Bypass -File code/v2ray_subs/local_run.ps1
+elapsed: 438s
+
+subs-check-pro binary ready: v3.5.0 (route cached)
+config written, local ports 24845 and 49990
+subs-check-pro started, pid 31112
+check done: all.yaml=True base64=True minutes=4
+usable nodes: 44 (socks 36 / vless 3 / vmess 3 / hysteria2 1 / trojan 1)
+v2rayN cores: xray=Xray 26.7.11 (Xray, Penetrates Everything.) 50231ea (go1.26.5 windows/amd64) | sing-box=sing-box version 1.14.1
+v2rayN ping url: https://www.google.com/generate_204 (guiNConfig)
+v2rayN last delays, group group_1: profiles=2292 minus1=2214 positive=78 zero=0
+v2rayN last delays, group group_2: profiles=55 minus1=47 positive=8 zero=0
+v2rayN last delays, group subs-check-pro可用节点-20261008: profiles=53 minus1=53 positive=0 zero=0
+v2rayN message: 运行 Core 失败，请查看提示信息 x33
+control (previous list, not delivered): tested 53, passed 3
+v2rayN-style test: tested 44, passed 3
+nodes kept for delivery: 3 (vless 3)
+delivered files to Desktop\v2ray-subs-20261009-2033
+v2rayN: imported 3 nodes into the new group
+receipt: results/v2ray_subs/RECEIPT_20261009-202705.json state=ok
