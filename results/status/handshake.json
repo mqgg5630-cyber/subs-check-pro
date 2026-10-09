@@ -1,9 +1,9 @@
 {
-  "round": 7,
-  "arena_state": "accepted",
-  "local_state": "passed",
-  "arena_updated": "2026-10-08 04:20:24",
-  "local_updated": "2026-10-08 12:19:37",
-  "host": "LAPTOP-R77M5D6M",
-  "note": "round 7: export the plain node list again (fixed line check)"
+  "round": 8,
+  "arena_state": "awaiting_check",
+  "local_state": "pending",
+  "arena_updated": "2026-10-09 12:06:56",
+  "local_updated": null,
+  "host": "",
+  "note": "round 8: restore the watcher (probe heartbeat before the v2rayN real-test work)"
 }
