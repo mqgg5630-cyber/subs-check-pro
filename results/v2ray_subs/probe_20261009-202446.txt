@@ -1,0 +1,24 @@
+probe 20261009-202446
+os: Microsoft Windows NT 10.0.26200.0 | ps: 5.1.26100.8875
+desktop folder exists: True
+LOCALAPPDATA set: True
+v2rayN: processes=1 pathUnreadable=1 guiNDB.db=True dir=v2rayN-windows-64
+  candidate folder v2rayN-windows-64-desktop: exe=False guiNDB.db=False
+  candidate folder v2rayN-windows-64-SelfContained: exe=False guiNDB.db=False
+  candidate folder v2rayN-windows-64: exe=True guiNDB.db=True
+  candidate folder v2rayN-windows-64-SelfContained: exe=True guiNDB.db=True
+python 3: py -3
+port 8199 free: True
+port 8299 free: True
+dynamic ports sample: 49238, 52433
+github release page: unreachable: WebException
+raw.githubusercontent index: HTTP 200
+git-sync watcher tasks: 8
+  git-sync-watch-git-pull-arena-01a0a9f0 state=Disabled
+  git-sync-watch-git-pull-arena-01a0ff69 state=Disabled
+  git-sync-watch-git-pull-arena-01a10bde state=Disabled
+  git-sync-watch-git-pull-arena-01a10bf3 state=Disabled
+  git-sync-watch-git-pull-arena-01a10bfd state=Running
+  git-sync-watch-Light-skills-ae80330d state=Disabled
+  git-sync-watch-Light-skills-sync state=Disabled
+  git-sync-watch-subs-check-pro-d2a66b2d state=Running
