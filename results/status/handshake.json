@@ -1,9 +1,9 @@
 {
-    "round":  8,
-    "arena_state":  "awaiting_check",
-    "local_state":  "passed",
-    "arena_updated":  "2026-10-09 12:06:56",
-    "local_updated":  "2026-10-09 20:24:52",
-    "host":  "LAPTOP-R77M5D6M",
-    "note":  "round 8: restore the watcher (probe heartbeat before the v2rayN real-test work)"
+  "round": 8,
+  "arena_state": "accepted",
+  "local_state": "passed",
+  "arena_updated": "2026-10-09 12:25:58",
+  "local_updated": "2026-10-09 20:24:52",
+  "host": "LAPTOP-R77M5D6M",
+  "note": "round 8: restore the watcher (probe heartbeat before the v2rayN real-test work)"
 }
