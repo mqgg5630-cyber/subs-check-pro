@@ -11,6 +11,11 @@
   "success_limit": 100,
   "check_timeout_min": 40,
   "desktop_folder_prefix": "v2ray-subs-",
-  "group_name": "subs-check-pro可用节点-20261008",
-  "v2rayn_import_wait_sec": 240
+  "group_name": "subs-check-pro实测可用-20261009",
+  "v2rayn_import_wait_sec": 240,
+  "v2rayn_realtest": {
+    "workers": 8,
+    "startup_wait_sec": 8,
+    "control_test": true
+  }
 }

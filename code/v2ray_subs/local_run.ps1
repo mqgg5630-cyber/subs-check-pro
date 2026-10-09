@@ -7,6 +7,10 @@
 #           V2Ray nodes go to a NEW Desktop folder, then ONE new subscription
 #           group is added to v2rayN. v2rayN is not restarted, the active node
 #           and the system proxy are not changed.
+#   realtest: like run, but before the Desktop folder and the v2rayN import every
+#           candidate node is tested the way v2rayN's real-ping test does (its own
+#           core, its ping URL, 5 s budget; see v2rayn_realtest.py). Only the nodes
+#           that answer are delivered and imported into a NEW group.
 # Exit 0 = passed. Anything else = failed (the receipt says at which stage).
 #   refresh: rebuilds the plain list, README and manifest of the newest Desktop
 #           folder from its own base64 file. No check, no import.
@@ -438,6 +442,76 @@ function Invoke-Probe {
     foreach ($t in $tasks) { Say ('  ' + $t.TaskName + ' state=' + $t.State) }
 }
 
+# ------------------------------------------- v2rayN-style real ping test (realtest)
+function Invoke-RealtestHelper([object]$py, [string[]]$helperArgs) {
+    # Runs code\v2ray_subs\v2rayn_realtest.py and returns its one JSON summary line.
+    $helper = Join-Path $repo 'code\v2ray_subs\v2rayn_realtest.py'
+    $all = New-Object System.Collections.ArrayList
+    foreach ($x in @($py.pre)) { [void]$all.Add([string]$x) }
+    [void]$all.Add($helper)
+    foreach ($x in $helperArgs) { [void]$all.Add([string]$x) }
+    $out = (& ([string]$py.exe) @($all.ToArray()) 2>&1 | Out-String)
+    $jl = @($out -split "`r?`n" | Where-Object { $_ -match '^\s*\{' })
+    if ($jl.Count -eq 0) {
+        $lastLines = @($out -split "`r?`n" | Where-Object { $_.Trim() -ne '' })
+        $tail = ''
+        if ($lastLines.Count -gt 0) { $tail = [string]$lastLines[$lastLines.Count - 1] }
+        if ($tail.Length -gt 200) { $tail = $tail.Substring(0, 200) }
+        $script:helperTail = $tail
+        return $null
+    }
+    return ($jl[$jl.Count - 1] | ConvertFrom-Json)
+}
+
+function Show-V2rayNFacts([object]$v, [object]$py) {
+    # Versions, the ping URL and the last delays v2rayN stored (counts only).
+    $gui = Join-Path $v.dir 'guiConfigs\guiNConfig.json'
+    $d = Invoke-RealtestHelper $py @('diag', '--dir', [string]$v.dir, '--db', [string]$v.db, '--gui', $gui)
+    if ($null -eq $d) { Say 'v2rayN facts: the helper gave no answer'; return }
+    Say ('v2rayN cores: xray=' + [string]$d.cores.xray + ' | sing-box=' + [string]$d.cores.sing_box)
+    Say ('v2rayN ping url: ' + [string]$d.ping_url + ' (' + [string]$d.ping_url_source + ')')
+    if ($d.db) {
+        if ($d.db.groups) {
+            foreach ($p in $d.db.groups.PSObject.Properties) {
+                $g = $p.Value
+                Say ('v2rayN last delays, group ' + $p.Name + ': profiles=' + [string]$g.profiles + ' minus1=' + [string]$g.minus1 + ' positive=' + [string]$g.positive + ' zero=' + [string]$g.zero_or_null)
+            }
+        }
+        if ($d.db.messages_top) {
+            foreach ($m in @($d.db.messages_top)) { Say ('v2rayN message: ' + [string]$m[0] + ' x' + [string]$m[1]) }
+        }
+    }
+}
+
+function Invoke-V2rayNTest([object]$v, [object]$py, [string[]]$links, [string]$label, [string]$workDir) {
+    # Tests the links with v2rayN's cores and ping URL. Files stay in the local work folder.
+    $res = @{ label = $label; tested = 0; passed = 0; error = ''; summary = $null; passedLinks = @() }
+    New-Item -ItemType Directory -Force -Path $workDir | Out-Null
+    $linksFile = Join-Path $workDir ($label + '_links.txt')
+    $outDir = Join-Path $workDir $label
+    Write-Utf8 $linksFile (($links -join "`n") + "`n")
+    $gui = Join-Path $v.dir 'guiConfigs\guiNConfig.json'
+    $st = Read-Settings
+    $workers = 8
+    $startup = 8
+    if ($st.v2rayn_realtest) {
+        if ($st.v2rayn_realtest.workers) { $workers = [int]$st.v2rayn_realtest.workers }
+        if ($st.v2rayn_realtest.startup_wait_sec) { $startup = [double]$st.v2rayn_realtest.startup_wait_sec }
+    }
+    $sum = Invoke-RealtestHelper $py @('test', '--links', $linksFile, '--dir', [string]$v.dir, '--out', $outDir, '--gui', $gui, '--workers', [string]$workers, '--startup', [string]$startup, '--label', $label)
+    Remove-Item -LiteralPath $linksFile -Force -ErrorAction SilentlyContinue
+    if ($null -eq $sum) { $res['error'] = ('helper gave no summary: ' + [string]$script:helperTail); return $res }
+    $res['summary'] = $sum
+    $res['tested'] = [int]$sum.tested
+    $res['passed'] = [int]$sum.passed
+    if ($sum.error) { $res['error'] = [string]$sum.error }
+    $pf = Join-Path $outDir 'passed.txt'
+    if (Test-Path -LiteralPath $pf) {
+        $res['passedLinks'] = @(Get-Content -LiteralPath $pf -Encoding UTF8 | Where-Object { $_ -match '://' })
+    }
+    return $res
+}
+
 # ----------------------------------------------------------------- run mode
 function Invoke-Run {
     $script:exitCode = 2
@@ -538,6 +612,37 @@ function Invoke-Run {
         $r['node_counts'] = @{ total = $nodes.Count; by_scheme = $info['hist'] }
         Say ('usable nodes: ' + $nodes.Count + ' (' + $breakdown + ')')
 
+        # 4b. realtest only: test the candidates the way v2rayN does, keep the ones that answer
+        if ($script:realtest) {
+            $r['stage'] = 'v2rayn-test'
+            $r['candidates'] = $nodes.Count
+            $v2 = Find-V2rayN
+            if (-not $v2.hasDb -or $v2.procCount -eq 0) { throw 'v2rayN is not running (or its database was not found), so the v2rayN-style test cannot run' }
+            $py2 = Find-Python
+            if ($null -eq $py2) { throw 'python 3 not found, so the v2rayN-style test cannot run' }
+            $rtDir = Join-Path $work ('realtest\' + $stamp)
+            Show-V2rayNFacts $v2 $py2
+            $desk2 = [Environment]::GetFolderPath('Desktop')
+            $prev = @(Get-ChildItem -LiteralPath $desk2 -Directory -Filter ([string]$st.desktop_folder_prefix + '*') -ErrorAction SilentlyContinue | Where-Object { Test-Path -LiteralPath (Join-Path $_.FullName 'v2ray_nodes_plain.txt') } | Sort-Object -Property Name -Descending)
+            if ($prev.Count -gt 0 -and [bool]$st.v2rayn_realtest.control_test) {
+                $prevLinks = @(Get-Content -LiteralPath (Join-Path $prev[0].FullName 'v2ray_nodes_plain.txt') -Encoding UTF8 | Where-Object { $_ -match '://' })
+                $ctl = Invoke-V2rayNTest $v2 $py2 $prevLinks 'control' $rtDir
+                $r['control'] = @{ folder = ('Desktop\' + $prev[0].Name); tested = $ctl.tested; passed = $ctl.passed }
+                Say ('control (previous list, not delivered): tested ' + [string]$ctl.tested + ', passed ' + [string]$ctl.passed)
+            }
+            $t = Invoke-V2rayNTest $v2 $py2 $nodes 'candidates' $rtDir
+            if ($t.error) { throw ('v2rayN-style test failed: ' + $t.error) }
+            $r['v2rayn_test'] = @{ tested = $t.tested; passed = $t.passed; ping_url = [string]$t.summary.ping_url; cores = $t.summary.cores; by_reason = $t.summary.by_reason }
+            Say ('v2rayN-style test: tested ' + [string]$t.tested + ', passed ' + [string]$t.passed)
+            if ($t.passed -eq 0) { throw 'no candidate node passed the v2rayN-style test' }
+            $nodes = @($t.passedLinks)
+            $hist2 = @{}
+            foreach ($p in $t.summary.by_scheme_passed.PSObject.Properties) { $hist2[$p.Name] = [int]$p.Value }
+            $breakdown = Get-Breakdown $hist2
+            $r['node_counts'] = @{ total = $nodes.Count; by_scheme = $hist2 }
+            Say ('nodes kept for delivery: ' + $nodes.Count + ' (' + $breakdown + ')')
+        }
+
         # 5. deliver: NEW folder on the Windows Desktop
         $r['stage'] = 'deliver'
         $desk = [Environment]::GetFolderPath('Desktop')
@@ -548,7 +653,12 @@ function Invoke-Run {
         $fPlain = Join-Path $folder 'v2ray_nodes_plain.txt'
         $fReadme = Join-Path $folder 'README.txt'
         $fManifest = Join-Path $folder 'manifest.json'
-        Copy-Item -LiteralPath $b64Path -Destination $fSub -Force
+        if ($script:realtest) {
+            $b64Text = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes((($nodes -join "`n") + "`n")))
+            Write-Utf8 $fSub ($b64Text + "`n")
+        } else {
+            Copy-Item -LiteralPath $b64Path -Destination $fSub -Force
+        }
         Write-Utf8 $fPlain (($nodes -join "`n") + "`n")
         $r['delivered'] = $true
         $r['folder'] = 'Desktop\' + (Split-Path -Leaf $folder)
@@ -602,6 +712,9 @@ function Invoke-Run {
             }
         }
         if (-not $importLine) { $importLine = 'v2rayN: added subscription group "' + [string]$st.group_name + '".' }
+        if ($script:realtest -and $r['v2rayn_test']) {
+            $importLine = 'Test: ' + [string]$r['v2rayn_test']['passed'] + ' of ' + [string]$r['v2rayn_test']['tested'] + ' candidate nodes answered the v2rayN-style test (its own core and ping URL). ' + $importLine
+        }
         $r['imported'] = [bool]$imp['ok']
         $r['v2rayn'] = $imp
         if ($imp['ok']) {
@@ -709,6 +822,7 @@ function Invoke-Export {
 switch ($Mode) {
     'probe' { Invoke-Probe }
     'run' { Invoke-Run }
+    'realtest' { $script:realtest = $true; Invoke-Run }
     'refresh' { Invoke-Refresh }
     'export' { Invoke-Export }
     default { Say ('unknown mode: ' + $Mode); $script:exitCode = 1 }
