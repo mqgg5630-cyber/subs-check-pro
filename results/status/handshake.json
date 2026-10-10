@@ -1,9 +1,9 @@
 {
-    "round":  11,
-    "arena_state":  "awaiting_check",
-    "local_state":  "failed",
-    "arena_updated":  "2026-10-10 01:19:26",
-    "local_updated":  "2026-10-10 09:20:04",
-    "host":  "LAPTOP-R77M5D6M",
-    "note":  "round 11: refresh the live v2rayN subscription UI and verify subs-check-pro group is visibly present before proceeding"
+  "round": 12,
+  "arena_state": "awaiting_check",
+  "local_state": "pending",
+  "arena_updated": "2026-10-10 01:22:36",
+  "local_updated": null,
+  "host": "",
+  "note": "round 12: retry live v2rayN UI group refresh with structural UI fallback; only pass if the named group is visibly confirmed"
 }
