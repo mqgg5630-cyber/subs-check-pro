@@ -1,9 +1,9 @@
 {
-    "round":  13,
-    "arena_state":  "awaiting_check",
-    "local_state":  "failed",
-    "arena_updated":  "2026-10-10 01:32:37",
-    "local_updated":  "2026-10-10 09:32:54",
-    "host":  "LAPTOP-R77M5D6M",
-    "note":  "round 13: user-approved controlled v2rayN restart, visible-group verification, then v2rayN GUI real-ping; pass only with positive native delay"
+  "round": 14,
+  "arena_state": "awaiting_check",
+  "local_state": "pending",
+  "arena_updated": "2026-10-10 01:35:57",
+  "local_updated": null,
+  "host": "",
+  "note": "round 14: retry user-approved native v2rayN restart and GUI real-ping; include safe helper diagnostic if restart is blocked"
 }
