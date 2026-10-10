@@ -544,7 +544,7 @@ def core_version(exe):
         return 'error: ' + type(e).__name__
 
 
-def db_facts(db, hint='subs-check-pro'):
+def db_facts(db, hint='subs-check-pro', target_group=''):
     out = {}
     uri = 'file:' + db.replace('\\', '/') + '?mode=ro'
     con = sqlite3.connect(uri, uri=True, timeout=5)
@@ -586,6 +586,27 @@ def db_facts(db, hint='subs-check-pro'):
                     label = name if hint in name else 'group_%d' % (i + 1)
                     labelled[label] = g
                 out['groups'] = labelled
+
+                if target_group:
+                    row = con.execute(
+                        'select Id from SubItem where Remarks = ? order by Sort limit 1',
+                        (target_group,),
+                    ).fetchone()
+                    target = {'exists': bool(row), 'profiles': 0, 'minus1': 0,
+                              'positive': 0, 'zero_or_null': 0}
+                    if row:
+                        tq = ('select e.Delay from ProfileItem p '
+                              'left join ProfileExItem e on e.IndexId = p.IndexId '
+                              'where p.Subid = ?')
+                        for (delay,) in con.execute(tq, (row[0],)):
+                            target['profiles'] += 1
+                            if delay == -1:
+                                target['minus1'] += 1
+                            elif delay and delay > 0:
+                                target['positive'] += 1
+                            else:
+                                target['zero_or_null'] += 1
+                    out['target_group'] = target
     finally:
         con.close()
     return out
@@ -602,7 +623,7 @@ def cmd_diag(a):
     res['ping_url_source'] = src
     if a.db and os.path.isfile(a.db):
         try:
-            res['db'] = db_facts(a.db)
+            res['db'] = db_facts(a.db, target_group=a.group)
         except Exception as e:
             res['db_error'] = type(e).__name__
     else:
@@ -618,6 +639,7 @@ def main(argv):
     d.add_argument('--dir', required=True)
     d.add_argument('--db', default='')
     d.add_argument('--gui', default='')
+    d.add_argument('--group', default='', help='group name for counts only; never emitted')
     t = sub.add_parser('test')
     t.add_argument('--links', required=True)
     t.add_argument('--dir', required=True)
