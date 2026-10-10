@@ -573,6 +573,16 @@ function Invoke-UiRefresh {
 }
 
 # --------------------------------------------------- UI restart + real-ping mode
+function Get-SafeHelperTail([string]$text) {
+    $lines = @($text -split "`r?`n" | Where-Object { $_.Trim() -ne '' })
+    if ($lines.Count -eq 0) { return '' }
+    $tail = [string]$lines[$lines.Count - 1]
+    if ($env:USERNAME) { $tail = $tail.Replace($env:USERNAME, '<user>') }
+    $tail = [regex]::Replace($tail, '(?i)[A-Z]:\\\S+', '<path>')
+    if ($tail.Length -gt 220) { $tail = $tail.Substring(0, 220) }
+    return $tail
+}
+
 function Invoke-V2rayNRestartHelper([object]$v, [string]$backupDir) {
     $helper = Join-Path $repo 'code\v2ray_subs\v2rayn_restart.ps1'
     $exe = Join-Path ([string]$v.dir) 'v2rayN.exe'
@@ -582,7 +592,12 @@ function Invoke-V2rayNRestartHelper([object]$v, [string]$backupDir) {
     $out = (& powershell.exe -NoProfile -ExecutionPolicy Bypass -File $helper -Exe $exe -Db ([string]$v.db) -Gui $gui -BackupDir $backupDir -WaitSec 35 2>&1 | Out-String)
     $code = $LASTEXITCODE
     $jsonLines = @($out -split "`r?`n" | Where-Object { $_ -match '^\s*\{' })
-    if ($jsonLines.Count -eq 0) { $res.error = 'restart helper did not return JSON'; return $res }
+    if ($jsonLines.Count -eq 0) {
+        $tail = Get-SafeHelperTail $out
+        $res.error = 'restart helper did not return JSON'
+        if ($tail) { $res.error += (': ' + $tail) }
+        return $res
+    }
     try {
         $detail = $jsonLines[$jsonLines.Count - 1] | ConvertFrom-Json
         $res.detail = $detail
