@@ -1,0 +1,6 @@
+check round 14 on LAPTOP-R77M5D6M - failed (exit 2)
+cmd: powershell -NoProfile -ExecutionPolicy Bypass -File code/v2ray_subs/local_run.ps1
+elapsed: 4s
+
+FAILED at stage restart: v2rayN restart was not confirmed: restart helper did not return JSON:     + FullyQualifiedErrorId : ParameterNameConflictsWithAlias
+receipt: results/v2ray_subs/RECEIPT_20261010-093710.json state=failed
