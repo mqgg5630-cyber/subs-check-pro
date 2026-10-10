@@ -11,6 +11,8 @@
 #           candidate node is tested the way v2rayN's real-ping test does (its own
 #           core, its ping URL, 5 s budget; see v2rayn_realtest.py). Only the nodes
 #           that answer are delivered and imported into a NEW group.
+#   uirefresh: uses the running v2rayN UI to refresh its subscription group list
+#           and succeeds only after the named group is visible in that list.
 # Exit 0 = passed. Anything else = failed (the receipt says at which stage).
 #   refresh: rebuilds the plain list, README and manifest of the newest Desktop
 #           folder from its own base64 file. No check, no import.
@@ -512,6 +514,62 @@ function Invoke-V2rayNTest([object]$v, [object]$py, [string[]]$links, [string]$l
     return $res
 }
 
+# ------------------------------------------------------------- UI refresh mode
+function Invoke-V2rayNUiRefreshHelper([object]$v, [string]$groupName) {
+    # Run in a nested PowerShell process so its exit code cannot end local_run.ps1.
+    $helper = Join-Path $repo 'code\v2ray_subs\v2rayn_ui_refresh.ps1'
+    $exe = Join-Path ([string]$v.dir) 'v2rayN.exe'
+    $res = @{ ok = $false; error = ''; detail = $null }
+    if (-not (Test-Path -LiteralPath $helper)) { $res.error = 'UI helper is missing'; return $res }
+    if (-not (Test-Path -LiteralPath $exe)) { $res.error = 'v2rayN.exe is missing from the detected folder'; return $res }
+    $out = (& powershell.exe -NoProfile -ExecutionPolicy Bypass -File $helper -Group $groupName -Exe $exe -WaitSec 14 2>&1 | Out-String)
+    $code = $LASTEXITCODE
+    $jsonLines = @($out -split "`r?`n" | Where-Object { $_ -match '^\s*\{' })
+    if ($jsonLines.Count -eq 0) {
+        $res.error = 'UI helper did not return JSON'
+        return $res
+    }
+    try {
+        $detail = $jsonLines[$jsonLines.Count - 1] | ConvertFrom-Json
+        $res.detail = $detail
+        $res.ok = ([bool]$detail.ok -and $code -eq 0)
+        if ($detail.error) { $res.error = [string]$detail.error }
+        if (-not $res.ok -and -not $res.error) { $res.error = ('UI helper exit ' + [string]$code) }
+    } catch {
+        $res.error = 'UI helper returned invalid JSON'
+    }
+    return $res
+}
+
+function Invoke-UiRefresh {
+    $script:exitCode = 2
+    $st = Read-Settings
+    $r = @{ mode = 'uirefresh'; stamp = $stamp; started = (Get-Date).ToString('yyyy-MM-dd HH:mm:ss'); state = 'failed'; stage = 'find'; group = [string]$st.group_name }
+    try {
+        $v = Find-V2rayN
+        if (-not $v.hasDb -or $v.procCount -ne 1) { throw 'v2rayN must be running as exactly one process with guiNDB.db present' }
+        $r['stage'] = 'ui-refresh'
+        $ui = Invoke-V2rayNUiRefreshHelper $v ([string]$st.group_name)
+        if ($ui.detail) {
+            $r['ui'] = @{ available = [bool]$ui.detail.ui_available; settings_group_seen = [bool]$ui.detail.settings_group_seen; main_group_seen = [bool]$ui.detail.main_group_seen; action = [string]$ui.detail.action }
+            Say ('v2rayN UI: available=' + [string]$ui.detail.ui_available + ' settings_group_seen=' + [string]$ui.detail.settings_group_seen + ' main_group_seen=' + [string]$ui.detail.main_group_seen + ' action=' + [string]$ui.detail.action)
+        }
+        if (-not $ui.ok) { throw ('v2rayN UI group visibility was not confirmed: ' + [string]$ui.error) }
+        $py = Find-Python
+        if ($py) { Show-V2rayNFacts $v $py }
+        $r['stage'] = 'visible'
+        $r['state'] = 'ok'
+        $script:exitCode = 0
+        Say ('v2rayN group is visible in the running UI: ' + [string]$st.group_name)
+    } catch {
+        $r['error'] = [string]$_.Exception.Message
+        Say ('FAILED at stage ' + [string]$r['stage'] + ': ' + $r['error'])
+    }
+    $r['finished'] = (Get-Date).ToString('yyyy-MM-dd HH:mm:ss')
+    $name = Write-Receipt $r
+    Say ('receipt: results/v2ray_subs/' + $name + ' state=' + $r['state'])
+}
+
 # ----------------------------------------------------------------- run mode
 function Invoke-Run {
     $script:exitCode = 2
@@ -823,6 +881,7 @@ switch ($Mode) {
     'probe' { Invoke-Probe }
     'run' { Invoke-Run }
     'realtest' { $script:realtest = $true; Invoke-Run }
+    'uirefresh' { Invoke-UiRefresh }
     'refresh' { Invoke-Refresh }
     'export' { Invoke-Export }
     default { Say ('unknown mode: ' + $Mode); $script:exitCode = 1 }
