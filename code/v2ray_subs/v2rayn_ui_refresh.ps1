@@ -89,6 +89,47 @@ function Window-For([object]$Element) {
     return $null
 }
 
+function All-ByControlType([object]$Root, [object]$ControlType) {
+    $out = @()
+    if ($null -eq $Root) { return $out }
+    try {
+        $all = $Root.FindAll([System.Windows.Automation.TreeScope]::Descendants,
+            [System.Windows.Automation.Condition]::TrueCondition)
+        foreach ($e in $all) {
+            try {
+                if ($e.Current.ControlType -eq $ControlType) { $out += $e }
+            } catch { }
+        }
+    } catch { }
+    return @($out)
+}
+
+function Child-MenuItems([object]$Root) {
+    $out = @()
+    if ($null -eq $Root) { return $out }
+    try {
+        $all = $Root.FindAll([System.Windows.Automation.TreeScope]::Children,
+            [System.Windows.Automation.Condition]::TrueCondition)
+        foreach ($e in $all) {
+            try {
+                if ($e.Current.ControlType -eq [System.Windows.Automation.ControlType]::MenuItem) { $out += $e }
+            } catch { }
+        }
+    } catch { }
+    return @($out)
+}
+
+function Expand-Ui([object]$Element) {
+    if ($null -eq $Element) { return $false }
+    try {
+        $p = [System.Windows.Automation.ExpandCollapsePattern]$Element.GetCurrentPattern(
+            [System.Windows.Automation.ExpandCollapsePattern]::Pattern)
+        if ($p.Current.ExpandCollapseState -ne [System.Windows.Automation.ExpandCollapseState]::Expanded) { $p.Expand() }
+        return $true
+    } catch { }
+    return $false
+}
+
 function Invoke-Ui([object]$Element) {
     if ($null -eq $Element) { return $false }
     try {
@@ -121,10 +162,40 @@ function Select-UiItem([object]$Element) {
     return $false
 }
 
+function Open-SubscriptionSettings([object]$Main) {
+    $item = First-ById $Main 'menuSubSetting'
+    if (Invoke-Ui $item) { return $true }
+
+    # Avalonia can omit x:Name from UI Automation. Its main menu has a stable
+    # layout: Servers, Subscription, Settings, Help, Reload, Promotion, Exit.
+    $bars = All-ByControlType $Main ([System.Windows.Automation.ControlType]::MenuBar)
+    foreach ($bar in $bars) {
+        $top = Child-MenuItems $bar
+        if ($top.Count -lt 2) { continue }
+        $subscription = $top[1]
+        if (-not (Expand-Ui $subscription)) { continue }
+        Start-Sleep -Milliseconds 300
+        $children = All-ByControlType $subscription ([System.Windows.Automation.ControlType]::MenuItem)
+        if ($children.Count -gt 0 -and (Invoke-Ui $children[0])) { return $true }
+    }
+    return $false
+}
+
+function Open-SubscriptionEdit([object]$Window) {
+    $edit = First-ById $Window 'menuSubEdit'
+    if (Invoke-Ui $edit) { return $true }
+    # The settings window menu is Add, Delete, Edit, Share, Close.
+    $items = All-ByControlType $Window ([System.Windows.Automation.ControlType]::MenuItem)
+    if ($items.Count -ge 3 -and (Invoke-Ui $items[2])) { return $true }
+    return $false
+}
+
 function Close-Settings([object]$Window) {
     if ($null -eq $Window) { return }
     $close = First-ById $Window 'menuClose'
     if (Invoke-Ui $close) { return }
+    $items = All-ByControlType $Window ([System.Windows.Automation.ControlType]::MenuItem)
+    if ($items.Count -gt 0 -and (Invoke-Ui $items[$items.Count - 1])) { return }
     try {
         $Window.SetFocus()
         [System.Windows.Forms.SendKeys]::SendWait('{ESC}')
@@ -164,9 +235,7 @@ try {
     $res.ui_available = $true
     try { $main.SetFocus() } catch { }
 
-    $subSetting = Wait-Until { First-ById $main 'menuSubSetting' } 3
-    if ($null -eq $subSetting) { throw 'ui_subscription_settings_control_not_found' }
-    if (-not (Invoke-Ui $subSetting)) { throw 'ui_subscription_settings_could_not_open' }
+    if (-not (Open-SubscriptionSettings $main)) { throw 'ui_subscription_settings_control_not_found' }
     $res.action = 'opened_settings'
 
     $subList = Wait-Until { First-ById $root 'lstSubscription' } $WaitSec
@@ -185,17 +254,27 @@ try {
         throw 'ui_group_could_not_be_selected'
     }
 
-    $edit = First-ById $settingsWindow 'menuSubEdit'
-    if ($null -eq $edit -or -not (Invoke-Ui $edit)) {
+    if (-not (Open-SubscriptionEdit $settingsWindow)) {
         Close-Settings $settingsWindow
         throw 'ui_subscription_edit_could_not_open'
     }
     $res.action = 'saved_existing_subscription'
 
-    $save = Wait-Until { First-ById $root 'btnSave' } $WaitSec
-    if ($null -eq $save -or -not (Invoke-Ui $save)) {
-        Close-Settings $settingsWindow
-        throw 'ui_subscription_save_could_not_invoke'
+    $save = Wait-Until { First-ById $root 'btnSave' } 3
+    if ($null -ne $save) {
+        if (-not (Invoke-Ui $save)) {
+            Close-Settings $settingsWindow
+            throw 'ui_subscription_save_could_not_invoke'
+        }
+    } else {
+        # The edit form marks Save as the default button. This fallback changes no fields.
+        try {
+            $settingsWindow.SetFocus()
+            [System.Windows.Forms.SendKeys]::SendWait('{ENTER}')
+        } catch {
+            Close-Settings $settingsWindow
+            throw 'ui_subscription_save_could_not_invoke'
+        }
     }
     Start-Sleep -Milliseconds 700
     Close-Settings $settingsWindow
