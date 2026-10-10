@@ -1,9 +1,9 @@
 {
-    "round":  12,
-    "arena_state":  "awaiting_check",
-    "local_state":  "failed",
-    "arena_updated":  "2026-10-10 01:22:36",
-    "local_updated":  "2026-10-10 09:24:26",
-    "host":  "LAPTOP-R77M5D6M",
-    "note":  "round 12: retry live v2rayN UI group refresh with structural UI fallback; only pass if the named group is visibly confirmed"
+  "round": 13,
+  "arena_state": "awaiting_check",
+  "local_state": "pending",
+  "arena_updated": "2026-10-10 01:32:37",
+  "local_updated": null,
+  "host": "",
+  "note": "round 13: user-approved controlled v2rayN restart, visible-group verification, then v2rayN GUI real-ping; pass only with positive native delay"
 }
