@@ -1,0 +1,7 @@
+check round 11 on LAPTOP-R77M5D6M - failed (exit 2)
+cmd: powershell -NoProfile -ExecutionPolicy Bypass -File code/v2ray_subs/local_run.ps1
+elapsed: 9s
+
+v2rayN UI: available=True settings_group_seen=False main_group_seen=False action=none
+FAILED at stage ui-refresh: v2rayN UI group visibility was not confirmed: ui_subscription_settings_control_not_found
+receipt: results/v2ray_subs/RECEIPT_20261010-091956.json state=failed
