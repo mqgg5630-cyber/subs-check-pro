@@ -15,6 +15,8 @@
 #           and succeeds only after the named group is visible in that list.
 #   uirestartrealping: after explicit approval, restarts v2rayN once, verifies
 #           the group in its UI, and invokes v2rayN's own real-ping command.
+#   elevatedrealping: requests UAC consent, then runs uirestartrealping at the
+#           same integrity level as an elevated v2rayN process.
 # Exit 0 = passed. Anything else = failed (the receipt says at which stage).
 #   refresh: rebuilds the plain list, README and manifest of the newest Desktop
 #           folder from its own base64 file. No check, no import.
@@ -692,6 +694,34 @@ function Invoke-UiRestartRealPing {
     Say ('receipt: results/v2ray_subs/' + $name + ' state=' + $r['state'])
 }
 
+function Invoke-ElevatedUiRestartRealPing {
+    # The existing v2rayN process is elevated, so a normal watcher cannot stop
+    # it or inspect its UI. The user sees and approves the UAC prompt produced
+    # by Start-Process -Verb RunAs; the elevated child writes the usual receipt.
+    $script:exitCode = 2
+    $work = Join-Path $env:LOCALAPPDATA 'subs-check-pro-d2a66b2d'
+    $runner = Join-Path $repo 'code\v2ray_subs\v2rayn_elevated_runner.ps1'
+    $resultFile = Join-Path $work ('elevation\result_' + $stamp + '.json')
+    try {
+        if (-not (Test-Path -LiteralPath $runner)) { throw 'elevated_runner_missing' }
+        New-Item -ItemType Directory -Force -Path (Split-Path -Parent $resultFile) | Out-Null
+        Remove-Item -LiteralPath $resultFile -Force -ErrorAction SilentlyContinue
+        $args = '-NoProfile -ExecutionPolicy Bypass -File "' + $runner + '" -Repo "' + $repo + '" -ResultPath "' + $resultFile + '"'
+        Say 'Requesting UAC approval to restart the elevated v2rayN and run its native GUI real-ping.'
+        $proc = Start-Process -FilePath 'powershell.exe' -Verb RunAs -ArgumentList $args -Wait -PassThru
+        if (-not (Test-Path -LiteralPath $resultFile)) { throw 'elevated_runner_no_result' }
+        $child = Get-Content -LiteralPath $resultFile -Raw -Encoding UTF8 | ConvertFrom-Json
+        if ([bool]$child.ok -and [int]$child.exit_code -eq 0 -and [int]$proc.ExitCode -eq 0) {
+            $script:exitCode = 0
+            Say 'Elevated v2rayN restart and GUI real-ping completed; see the child receipt for verified details.'
+        } else {
+            Say 'Elevated v2rayN restart and GUI real-ping did not pass; see the child receipt for the guarded failure stage.'
+        }
+    } catch {
+        Say 'FAILED to start or complete the UAC-approved v2rayN action.'
+    }
+}
+
 # ----------------------------------------------------------------- run mode
 function Invoke-Run {
     $script:exitCode = 2
@@ -1005,6 +1035,7 @@ switch ($Mode) {
     'realtest' { $script:realtest = $true; Invoke-Run }
     'uirefresh' { Invoke-UiRefresh }
     'uirestartrealping' { Invoke-UiRestartRealPing }
+    'elevatedrealping' { Invoke-ElevatedUiRestartRealPing }
     'refresh' { Invoke-Refresh }
     'export' { Invoke-Export }
     default { Say ('unknown mode: ' + $Mode); $script:exitCode = 1 }
