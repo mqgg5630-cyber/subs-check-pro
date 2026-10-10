@@ -1,0 +1,6 @@
+check round 16 on LAPTOP-R77M5D6M - failed (exit 1)
+cmd: powershell -NoProfile -ExecutionPolicy Bypass -File code/v2ray_subs/local_run.ps1
+elapsed: 3612s
+TIMEOUT: killed after 60 min
+
+Requesting UAC approval to restart the elevated v2rayN and run its native GUI real-ping.

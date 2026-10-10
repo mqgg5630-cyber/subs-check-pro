@@ -1,9 +1,9 @@
 {
-  "round": 16,
-  "arena_state": "awaiting_check",
-  "local_state": "pending",
-  "arena_updated": "2026-10-10 01:42:09",
-  "local_updated": null,
-  "host": "",
-  "note": "round 16: UAC-assisted approved v2rayN restart and native GUI real-ping; approve the Windows UAC prompt if shown"
+    "round":  16,
+    "arena_state":  "awaiting_check",
+    "local_state":  "failed",
+    "arena_updated":  "2026-10-10 01:42:09",
+    "local_updated":  "2026-10-10 10:43:58",
+    "host":  "LAPTOP-R77M5D6M",
+    "note":  "round 16: UAC-assisted approved v2rayN restart and native GUI real-ping; approve the Windows UAC prompt if shown"
 }
