@@ -1,0 +1,7 @@
+check round 15 on LAPTOP-R77M5D6M - failed (exit 2)
+cmd: powershell -NoProfile -ExecutionPolicy Bypass -File code/v2ray_subs/local_run.ps1
+elapsed: 4s
+
+v2rayN restart: stopped=False started=False active_index_same=True proxy_unchanged=True
+FAILED at stage restart: v2rayN restart was not confirmed: 由于以下错误而无法停止进程“v2rayN (10264)”: 拒绝访问。
+receipt: results/v2ray_subs/RECEIPT_20261010-093925.json state=failed

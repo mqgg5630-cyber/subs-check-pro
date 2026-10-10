@@ -1,9 +1,9 @@
 {
-  "round": 15,
-  "arena_state": "awaiting_check",
-  "local_state": "pending",
-  "arena_updated": "2026-10-10 01:39:22",
-  "local_updated": null,
-  "host": "",
-  "note": "round 15: approved v2rayN restart and native GUI real-ping after parameter compatibility fix"
+    "round":  15,
+    "arena_state":  "awaiting_check",
+    "local_state":  "failed",
+    "arena_updated":  "2026-10-10 01:39:22",
+    "local_updated":  "2026-10-10 09:39:28",
+    "host":  "LAPTOP-R77M5D6M",
+    "note":  "round 15: approved v2rayN restart and native GUI real-ping after parameter compatibility fix"
 }
