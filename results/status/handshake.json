@@ -1,9 +1,9 @@
 {
-  "round": 10,
-  "arena_state": "awaiting_check",
-  "local_state": "pending",
-  "arena_updated": "2026-10-10 00:54:07",
-  "local_updated": null,
-  "host": "",
-  "note": "round 10: expanded 13 public sources; target 300 candidates; v2rayN-style realtest; import only passing nodes into new group"
+    "round":  10,
+    "arena_state":  "awaiting_check",
+    "local_state":  "passed",
+    "arena_updated":  "2026-10-10 00:54:07",
+    "local_updated":  "2026-10-10 09:09:47",
+    "host":  "LAPTOP-R77M5D6M",
+    "note":  "round 10: expanded 13 public sources; target 300 candidates; v2rayN-style realtest; import only passing nodes into new group"
 }
