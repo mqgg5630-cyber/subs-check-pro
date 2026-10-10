@@ -6,12 +6,22 @@
   "sub_urls_remote": [
     "https://raw.githubusercontent.com/sinspired/airport/main/subs/merged/col.txt",
     "https://raw.githubusercontent.com/sinspired/airport/main/subs/merged/cm.txt",
-    "https://raw.githubusercontent.com/sinspired/airport/main/subs/merged/scan.txt"
+    "https://raw.githubusercontent.com/sinspired/airport/main/subs/merged/scan.txt",
+    "https://raw.githubusercontent.com/mahdibland/V2RayAggregator/master/sub/sub_merge.txt",
+    "https://raw.githubusercontent.com/aiboboxx/v2rayfree/main/sub",
+    "https://raw.githubusercontent.com/peasoft/NoMoreWalls/master/list.txt",
+    "https://raw.githubusercontent.com/ermaozi/get_subscribe/main/subscribe/v2ray.txt",
+    "https://raw.githubusercontent.com/mfuu/v2ray/master/sub",
+    "https://raw.githubusercontent.com/Barabama/FreeNodes/feat/ai-crawler-v2/nodes/nodev2ray.txt",
+    "https://raw.githubusercontent.com/free18/v2ray/main/v.txt",
+    "https://raw.githubusercontent.com/ssrsub/ssr/master/v2ray",
+    "https://raw.githubusercontent.com/Pawdroid/Free-servers/main/sub",
+    "https://raw.githubusercontent.com/vxiaov/free_proxies/main/links.txt"
   ],
-  "success_limit": 100,
+  "success_limit": 300,
   "check_timeout_min": 40,
   "desktop_folder_prefix": "v2ray-subs-",
-  "group_name": "subs-check-pro实测可用-20261009",
+  "group_name": "subs-check-pro实测可用-扩展来源-20261010",
   "v2rayn_import_wait_sec": 240,
   "v2rayn_realtest": {
     "workers": 8,
