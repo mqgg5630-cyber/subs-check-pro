@@ -1,1 +1,1 @@
-uirefresh
+uirestartrealping

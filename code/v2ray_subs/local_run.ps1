@@ -13,6 +13,8 @@
 #           that answer are delivered and imported into a NEW group.
 #   uirefresh: uses the running v2rayN UI to refresh its subscription group list
 #           and succeeds only after the named group is visible in that list.
+#   uirestartrealping: after explicit approval, restarts v2rayN once, verifies
+#           the group in its UI, and invokes v2rayN's own real-ping command.
 # Exit 0 = passed. Anything else = failed (the receipt says at which stage).
 #   refresh: rebuilds the plain list, README and manifest of the newest Desktop
 #           folder from its own base64 file. No check, no import.
@@ -570,6 +572,111 @@ function Invoke-UiRefresh {
     Say ('receipt: results/v2ray_subs/' + $name + ' state=' + $r['state'])
 }
 
+# --------------------------------------------------- UI restart + real-ping mode
+function Invoke-V2rayNRestartHelper([object]$v, [string]$backupDir) {
+    $helper = Join-Path $repo 'code\v2ray_subs\v2rayn_restart.ps1'
+    $exe = Join-Path ([string]$v.dir) 'v2rayN.exe'
+    $gui = Join-Path ([string]$v.dir) 'guiConfigs\guiNConfig.json'
+    $res = @{ ok = $false; error = ''; detail = $null }
+    if (-not (Test-Path -LiteralPath $helper)) { $res.error = 'restart helper is missing'; return $res }
+    $out = (& powershell.exe -NoProfile -ExecutionPolicy Bypass -File $helper -Exe $exe -Db ([string]$v.db) -Gui $gui -BackupDir $backupDir -WaitSec 35 2>&1 | Out-String)
+    $code = $LASTEXITCODE
+    $jsonLines = @($out -split "`r?`n" | Where-Object { $_ -match '^\s*\{' })
+    if ($jsonLines.Count -eq 0) { $res.error = 'restart helper did not return JSON'; return $res }
+    try {
+        $detail = $jsonLines[$jsonLines.Count - 1] | ConvertFrom-Json
+        $res.detail = $detail
+        $res.ok = ([bool]$detail.ok -and $code -eq 0)
+        if ($detail.error) { $res.error = [string]$detail.error }
+        if (-not $res.ok -and -not $res.error) { $res.error = ('restart helper exit ' + [string]$code) }
+    } catch { $res.error = 'restart helper returned invalid JSON' }
+    return $res
+}
+
+function Invoke-V2rayNGuiRealPingHelper([object]$v, [string]$groupName) {
+    $helper = Join-Path $repo 'code\v2ray_subs\v2rayn_gui_realping.ps1'
+    $exe = Join-Path ([string]$v.dir) 'v2rayN.exe'
+    $res = @{ ok = $false; error = ''; detail = $null }
+    if (-not (Test-Path -LiteralPath $helper)) { $res.error = 'GUI real-ping helper is missing'; return $res }
+    $out = (& powershell.exe -NoProfile -ExecutionPolicy Bypass -File $helper -Group $groupName -Exe $exe -WaitSec 18 2>&1 | Out-String)
+    $code = $LASTEXITCODE
+    $jsonLines = @($out -split "`r?`n" | Where-Object { $_ -match '^\s*\{' })
+    if ($jsonLines.Count -eq 0) { $res.error = 'GUI real-ping helper did not return JSON'; return $res }
+    try {
+        $detail = $jsonLines[$jsonLines.Count - 1] | ConvertFrom-Json
+        $res.detail = $detail
+        $res.ok = ([bool]$detail.ok -and $code -eq 0)
+        if ($detail.error) { $res.error = [string]$detail.error }
+        if (-not $res.ok -and -not $res.error) { $res.error = ('GUI real-ping helper exit ' + [string]$code) }
+    } catch { $res.error = 'GUI real-ping helper returned invalid JSON' }
+    return $res
+}
+
+function Get-V2rayNGroupFacts([object]$v, [object]$py, [string]$groupName) {
+    $gui = Join-Path ([string]$v.dir) 'guiConfigs\guiNConfig.json'
+    $d = Invoke-RealtestHelper $py @('diag', '--dir', [string]$v.dir, '--db', [string]$v.db, '--gui', $gui, '--group', $groupName)
+    if ($null -eq $d -or $null -eq $d.db -or $null -eq $d.db.target_group) { return $null }
+    return $d.db.target_group
+}
+
+function Invoke-UiRestartRealPing {
+    $script:exitCode = 2
+    $st = Read-Settings
+    $r = @{ mode = 'uirestartrealping'; stamp = $stamp; started = (Get-Date).ToString('yyyy-MM-dd HH:mm:ss'); state = 'failed'; stage = 'find'; group = [string]$st.group_name }
+    try {
+        $v = Find-V2rayN
+        if (-not $v.hasDb -or $v.procCount -ne 1) { throw 'v2rayN must be running as exactly one process with guiNDB.db present' }
+        $py = Find-Python
+        if ($null -eq $py) { throw 'python 3 is required to verify v2rayN real-ping results' }
+        $before = Get-V2rayNGroupFacts $v $py ([string]$st.group_name)
+        if ($null -eq $before -or -not [bool]$before.exists -or [int]$before.profiles -le 0) { throw 'the expected v2rayN group is absent from its database' }
+        $r['before'] = @{ profiles = [int]$before.profiles; minus1 = [int]$before.minus1; positive = [int]$before.positive; zero_or_null = [int]$before.zero_or_null }
+
+        $r['stage'] = 'restart'
+        $work = Join-Path $env:LOCALAPPDATA 'subs-check-pro-d2a66b2d'
+        $restart = Invoke-V2rayNRestartHelper $v (Join-Path $work 'backup')
+        if ($restart.detail) {
+            $r['restart'] = @{ stopped = [bool]$restart.detail.stopped; started = [bool]$restart.detail.started; active_index_same = [bool]$restart.detail.active_index_same; proxy_unchanged = [bool]$restart.detail.proxy_unchanged; proxy_restored = [bool]$restart.detail.proxy_restored; backup = [string]$restart.detail.backup }
+            Say ('v2rayN restart: stopped=' + [string]$restart.detail.stopped + ' started=' + [string]$restart.detail.started + ' active_index_same=' + [string]$restart.detail.active_index_same + ' proxy_unchanged=' + [string]$restart.detail.proxy_unchanged)
+        }
+        if (-not $restart.ok) { throw ('v2rayN restart was not confirmed: ' + [string]$restart.error) }
+
+        $v = Find-V2rayN
+        if (-not $v.hasDb -or $v.procCount -ne 1) { throw 'v2rayN did not return as one running process' }
+        $r['stage'] = 'ui-realping'
+        $ui = Invoke-V2rayNGuiRealPingHelper $v ([string]$st.group_name)
+        if ($ui.detail) {
+            $r['ui'] = @{ available = [bool]$ui.detail.ui_available; group_seen = [bool]$ui.detail.group_seen; group_selected = [bool]$ui.detail.group_selected; realping_started = [bool]$ui.detail.realping_started }
+            Say ('v2rayN UI: available=' + [string]$ui.detail.ui_available + ' group_seen=' + [string]$ui.detail.group_seen + ' group_selected=' + [string]$ui.detail.group_selected + ' realping_started=' + [string]$ui.detail.realping_started)
+        }
+        if (-not $ui.ok) { throw ('v2rayN GUI real-ping was not started: ' + [string]$ui.error) }
+
+        $r['stage'] = 'wait-realping'
+        $deadline = (Get-Date).AddSeconds(180)
+        $after = $null
+        do {
+            Start-Sleep -Seconds 3
+            $after = Get-V2rayNGroupFacts $v $py ([string]$st.group_name)
+            if ($after -and [int]$after.positive -gt 0) { break }
+        } while ((Get-Date) -lt $deadline)
+        if ($null -eq $after) { throw 'could not read v2rayN real-ping results from its database' }
+        $r['realping'] = @{ profiles = [int]$after.profiles; minus1 = [int]$after.minus1; positive = [int]$after.positive; zero_or_null = [int]$after.zero_or_null }
+        Say ('v2rayN GUI real-ping results: profiles=' + [string]$after.profiles + ' positive=' + [string]$after.positive + ' minus1=' + [string]$after.minus1 + ' zero=' + [string]$after.zero_or_null)
+        if ([int]$after.positive -le 0) { throw 'v2rayN GUI real-ping produced no positive delay' }
+
+        $r['stage'] = 'passed'
+        $r['state'] = 'ok'
+        $script:exitCode = 0
+        Say ('v2rayN GUI real-ping passed for group: ' + [string]$st.group_name)
+    } catch {
+        $r['error'] = [string]$_.Exception.Message
+        Say ('FAILED at stage ' + [string]$r['stage'] + ': ' + $r['error'])
+    }
+    $r['finished'] = (Get-Date).ToString('yyyy-MM-dd HH:mm:ss')
+    $name = Write-Receipt $r
+    Say ('receipt: results/v2ray_subs/' + $name + ' state=' + $r['state'])
+}
+
 # ----------------------------------------------------------------- run mode
 function Invoke-Run {
     $script:exitCode = 2
@@ -882,6 +989,7 @@ switch ($Mode) {
     'run' { Invoke-Run }
     'realtest' { $script:realtest = $true; Invoke-Run }
     'uirefresh' { Invoke-UiRefresh }
+    'uirestartrealping' { Invoke-UiRestartRealPing }
     'refresh' { Invoke-Refresh }
     'export' { Invoke-Export }
     default { Say ('unknown mode: ' + $Mode); $script:exitCode = 1 }
