@@ -5,7 +5,7 @@
 # ASCII-only for Windows PowerShell 5.1.
 param(
     [Parameter(Mandatory = $true)][string]$Exe,
-    [Parameter(Mandatory = $true)][string]$Db,
+    [Parameter(Mandatory = $true)][string]$DatabasePath,
     [Parameter(Mandatory = $true)][string]$Gui,
     [Parameter(Mandatory = $true)][string]$BackupDir,
     [int]$WaitSec = 35
@@ -102,7 +102,7 @@ function Restore-ProxySnapshot([object[]]$snap) {
 
 try {
     if (-not (Test-Path -LiteralPath $Exe)) { throw 'exe_not_found' }
-    if (-not (Test-Path -LiteralPath $Db)) { throw 'database_not_found' }
+    if (-not (Test-Path -LiteralPath $DatabasePath)) { throw 'database_not_found' }
     New-Item -ItemType Directory -Force -Path $BackupDir | Out-Null
 
     $beforeConfig = Get-ConfigState $Gui
@@ -110,9 +110,9 @@ try {
     $beforeProxy = Get-ProxySnapshot
 
     $backup = Join-Path $BackupDir ('guiNDB.before-ui-restart-' + (Get-Date -Format 'yyyyMMdd-HHmmss') + '.db')
-    Copy-Item -LiteralPath $Db -Destination $backup -Force
+    Copy-Item -LiteralPath $DatabasePath -Destination $backup -Force
     foreach ($suffix in @('-wal', '-shm')) {
-        $side = $Db + $suffix
+        $side = $DatabasePath + $suffix
         if (Test-Path -LiteralPath $side) { Copy-Item -LiteralPath $side -Destination ($backup + $suffix) -Force }
     }
     $res.backup = Split-Path -Leaf $backup

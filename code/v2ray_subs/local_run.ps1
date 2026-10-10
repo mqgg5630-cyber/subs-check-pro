@@ -589,7 +589,7 @@ function Invoke-V2rayNRestartHelper([object]$v, [string]$backupDir) {
     $gui = Join-Path ([string]$v.dir) 'guiConfigs\guiNConfig.json'
     $res = @{ ok = $false; error = ''; detail = $null }
     if (-not (Test-Path -LiteralPath $helper)) { $res.error = 'restart helper is missing'; return $res }
-    $out = (& powershell.exe -NoProfile -ExecutionPolicy Bypass -File $helper -Exe $exe -Db ([string]$v.db) -Gui $gui -BackupDir $backupDir -WaitSec 35 2>&1 | Out-String)
+    $out = (& powershell.exe -NoProfile -ExecutionPolicy Bypass -File $helper -Exe $exe -DatabasePath ([string]$v.db) -Gui $gui -BackupDir $backupDir -WaitSec 35 2>&1 | Out-String)
     $code = $LASTEXITCODE
     $jsonLines = @($out -split "`r?`n" | Where-Object { $_ -match '^\s*\{' })
     if ($jsonLines.Count -eq 0) {
