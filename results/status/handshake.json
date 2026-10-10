@@ -1,9 +1,9 @@
 {
-  "round": 10,
-  "arena_state": "accepted",
-  "local_state": "passed",
-  "arena_updated": "2026-10-10 01:12:30",
-  "local_updated": "2026-10-10 09:09:47",
-  "host": "LAPTOP-R77M5D6M",
-  "note": "round 10 complete: local watcher restored; expanded-source realtest imported 8 passing nodes into the new group"
+  "round": 11,
+  "arena_state": "awaiting_check",
+  "local_state": "pending",
+  "arena_updated": "2026-10-10 01:19:26",
+  "local_updated": null,
+  "host": "",
+  "note": "round 11: refresh the live v2rayN subscription UI and verify subs-check-pro group is visibly present before proceeding"
 }
