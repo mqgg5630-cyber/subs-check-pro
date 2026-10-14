@@ -38,11 +38,15 @@ python -m pip install -r code/civil_service_exam/requirements.txt
 python code/civil_service_exam/analyze_positions.py \
   --input 'results/civil_service_exam/source/<position-table>.xls' \
   --profile config/civil_service_profile.local.json \
-  --out deliverables/civil_service_exam_2027
+  --out results/civil_service_exam/local_analysis
 ```
 
-Use `--no-profile` to inspect the public table and detected columns before a
-profile is available.
+The parser includes every worksheet with a recognizable position-table header;
+use `--sheet '<exact worksheet name>'` only when intentionally narrowing the
+scope. Use `--no-profile` to inspect the public table and detected columns
+before a profile is available. Keep the full personal output local; if a
+shareable deliverable is needed, publish only a redacted, source-referenced
+candidate summary rather than the profile or full personalised export.
 
 ## Required review discipline
 

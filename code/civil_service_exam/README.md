@@ -66,10 +66,18 @@ python3 code/civil_service_exam/analyze_positions.py \
   --profile config/civil_service_profile.local.json
 ```
 
+默认会扫描**每一个能识别职位表头的工作表**并合并结果，而不是只读取第一个或“得分最高”的工作表。输出中保留 `raw__source_sheet` 与 `raw__source_excel_row`，可回到原工作簿复核。只有在你明确要缩小范围时才使用 `--sheet '<工作表名>'`。
+
 若只想先识别职位表列名和导出标准化表，不输入任何个人资料：
 
 ```bash
 python3 code/civil_service_exam/analyze_positions.py --no-profile
+```
+
+修改筛选规则后，可运行内置回归检查（需要同一组 Excel/Pandas 依赖）：
+
+```bash
+python3 code/civil_service_exam/verify_analyze_positions.py -v
 ```
 
 默认输出位于 `results/civil_service_exam/local_analysis/`，该目录被 `.gitignore` 排除，避免将个人偏好或本机分析结果自动推送。待职位表到达 Arena 后，可在对话中给出你的必要资格与岗位偏好，我会在仓库中单独生成可审计的候选清单。

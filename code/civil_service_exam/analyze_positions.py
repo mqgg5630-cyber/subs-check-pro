@@ -50,7 +50,7 @@ COLUMN_ALIASES: dict[str, tuple[str, ...]] = {
     "department": ("部门名称", "招录机关名称", "招录机关", "部门"),
     "agency": ("用人司局", "招录单位", "机构名称", "用人单位"),
     "position_code": ("职位代码", "招考职位代码", "职位编号", "岗位代码"),
-    "position": ("职位名称", "招考职位名称", "岗位名称"),
+    "position": ("职位名称", "招考职位名称", "招考职位", "岗位名称"),
     "position_nature": ("职位属性", "职位性质", "岗位属性"),
     "position_intro": ("职位简介", "职位介绍", "工作内容", "职位说明"),
     "level": ("机构层级", "机构级别", "单位层级"),
@@ -76,7 +76,12 @@ PROVINCE_ALIASES: dict[str, tuple[str, ...]] = {
     "四川": ("四川", "成都", "绵阳", "德阳", "乐山", "宜宾", "泸州", "南充", "达州", "自贡", "攀枝花", "眉山", "资阳", "广元", "遂宁", "内江", "广安", "雅安", "巴中", "阿坝", "甘孜", "凉山"),
 }
 
-OPEN_REQUIREMENT = ("不限", "无限制", "不限制", "无", "无要求", "专业不限", "无基层工作经历", "没有要求")
+# These values must be matched as complete cells after normalization.  In
+# particular, matching the one-character token “无” as a substring would turn
+# requirements such as “无机化学” or “无人驾驶航空器系统工程” into false
+# “open” requirements.
+OPEN_REQUIREMENT = frozenset({"不限", "无限制", "不限制", "无", "无要求", "专业不限", "无基层工作经历", "没有要求"})
+GENERIC_MAJOR_KEYWORDS = frozenset({"专业", "相关专业", "不限", "无", "无要求", "所有专业"})
 SENSITIVE_RESTRICTION = ("限男性", "限女性", "性别", "民族", "残疾", "身高", "视力")
 
 EDU_LEVELS = {
@@ -125,16 +130,24 @@ def key(value: Any) -> str:
     return re.sub(r"[\s\-_（）()【】\[\]：:，,。．/]+", "", text(value)).lower()
 
 
+OPEN_REQUIREMENT_KEYS = frozenset(key(token) for token in OPEN_REQUIREMENT)
+GENERIC_MAJOR_KEYWORD_KEYS = frozenset(key(token) for token in GENERIC_MAJOR_KEYWORDS)
+
+
 def any_contains(haystack: str, needles: Iterable[str]) -> list[str]:
     source = text(haystack).lower()
     return [needle for needle in (text(x) for x in needles) if needle and needle.lower() in source]
 
 
 def is_open_requirement(requirement: str) -> bool:
-    value = text(requirement)
-    if not value:
-        return False
-    return any(token in value for token in OPEN_REQUIREMENT)
+    """Return whether a complete requirement cell explicitly says it is open.
+
+    Deliberately avoid substring matching here.  A bare ``无`` is a valid open
+    cell, but it also occurs inside named majors such as ``无机化学`` and
+    ``无人驾驶航空器系统工程``.
+    """
+    value = key(requirement)
+    return bool(value) and value in OPEN_REQUIREMENT_KEYS
 
 
 def find_default_input() -> Path | None:
@@ -158,8 +171,14 @@ def score_header_row(frame: pd.DataFrame) -> int:
     return total
 
 
-def load_position_table(input_path: Path, requested_sheet: str | None = None) -> tuple[pd.DataFrame, str, int]:
-    """Locate a header row even when the workbook has title/merged rows first."""
+def load_position_table(input_path: Path, requested_sheet: str | None = None) -> tuple[pd.DataFrame, list[tuple[str, int, int]]]:
+    """Read every position-bearing sheet, including title/merged rows above headers.
+
+    National civil-service workbooks split positions over many sheets (for
+    example, party/state organs, vertical systems, and regional systems). A
+    first-sheet-only parser can produce a plausible but dangerously incomplete
+    shortlist, so every sheet with a recognizable header is included.
+    """
     try:
         raw_book = pd.read_excel(input_path, sheet_name=None, header=None, dtype=str)
     except Exception as exc:
@@ -175,31 +194,38 @@ def load_position_table(input_path: Path, requested_sheet: str | None = None) ->
             raise ValueError(f"Sheet not found: {requested_sheet}. Available: {', '.join(map(str, raw_book))}")
         raw_book = {requested_sheet: raw_book[requested_sheet]}
 
-    best: tuple[int, str, int] | None = None
+    sheets: list[tuple[str, int, int]] = []
+    frames: list[pd.DataFrame] = []
     for sheet_name, raw in raw_book.items():
+        best_row: int | None = None
+        best_score = -1
         for header_row in range(min(len(raw), 30)):
             score = score_header_row(raw.iloc[header_row])
-            candidate = (score, str(sheet_name), header_row)
-            if best is None or candidate[0] > best[0]:
-                best = candidate
-    if best is None or best[0] < 3:
+            if score > best_score:
+                best_score, best_row = score, header_row
+        if best_row is None or best_score < 3:
+            continue
+        try:
+            table = pd.read_excel(input_path, sheet_name=sheet_name, header=best_row, dtype=str)
+        except Exception as exc:
+            raise RuntimeError(f"Failed to reopen selected sheet '{sheet_name}': {exc}") from exc
+        table = table.dropna(axis=0, how="all").copy()
+        table.columns = [text(column) for column in table.columns]
+        table = table.loc[:, [column for column in table.columns if column and not column.lower().startswith("unnamed")]]
+        if table.empty:
+            continue
+        table.insert(0, "_source_excel_row", range(best_row + 2, best_row + 2 + len(table)))
+        table.insert(0, "_source_sheet", str(sheet_name))
+        frames.append(table)
+        sheets.append((str(sheet_name), best_row, len(table)))
+
+    if not frames:
         sheet_summary = ", ".join(f"{name}({len(frame)} rows)" for name, frame in raw_book.items())
         raise ValueError(
             "Could not confidently locate a position-table header row. "
             f"Sheets scanned: {sheet_summary}. Use --sheet or add aliases in COLUMN_ALIASES."
         )
-
-    _, sheet_name, header_row = best
-    try:
-        table = pd.read_excel(input_path, sheet_name=sheet_name, header=header_row, dtype=str)
-    except Exception as exc:
-        raise RuntimeError(f"Failed to reopen selected sheet '{sheet_name}': {exc}") from exc
-    table = table.dropna(axis=0, how="all").copy()
-    table.columns = [text(column) for column in table.columns]
-    table = table.loc[:, [column for column in table.columns if column and not column.lower().startswith("unnamed")]]
-    table.insert(0, "_source_excel_row", range(header_row + 2, header_row + 2 + len(table)))
-    table.insert(0, "_source_sheet", sheet_name)
-    return table, sheet_name, header_row
+    return pd.concat(frames, ignore_index=True, sort=False), sheets
 
 
 def map_columns(columns: Iterable[str]) -> dict[str, str]:
@@ -277,6 +303,8 @@ def assess_degree(requirement: str, profile: dict[str, Any]) -> Assessment:
         return Assessment("match", "degree requirement is open")
     if not supplied:
         return Assessment("review", f"degree required: {requirement}; profile has no degree value")
+    if "相对应的学位" in requirement:
+        return Assessment("match", "profile provides a degree for the stated highest-education pairing requirement")
     candidate_level = highest_education(supplied)
     required_level = requested_min_education(requirement)
     if candidate_level is None or required_level is None:
@@ -292,17 +320,38 @@ def assess_degree(requirement: str, profile: dict[str, Any]) -> Assessment:
 
 def assess_major(requirement: str, profile: dict[str, Any]) -> Assessment:
     requirement = text(requirement)
-    majors = [text(item) for item in profile.get("major_keywords", []) if text(item)]
+    majors = [
+        text(item)
+        for item in profile.get("major_keywords", [])
+        if text(item) and key(item) not in GENERIC_MAJOR_KEYWORD_KEYS
+    ]
     if not requirement:
         return Assessment("review", "Excel did not provide a recognizable major requirement")
     if is_open_requirement(requirement):
         return Assessment("match", "major requirement is open")
     if not majors:
-        return Assessment("review", f"major required: {requirement}; profile has no major keywords")
+        return Assessment("review", f"major required: {requirement}; profile has no usable named-major keyword")
     hits = any_contains(requirement, majors)
     if hits:
         return Assessment("match", f"major keyword match: {', '.join(hits)}")
-    if any(token in requirement for token in ("相关专业", "专业目录", "学科门类")):
+
+    # “英语相关专业” in an otherwise specific list is not an ambiguous match
+    # for an unrelated major.  Reserve manual review for a genuinely generic
+    # “related major” label, a catalogue reference, or a related-major phrase
+    # sharing a meaningful stem with a supplied named major.
+    pieces = [text(item) for item in re.split(r"[、,，;；/]", requirement) if text(item)]
+    related_pieces = [item for item in pieces if "相关专业" in item]
+    for related in related_pieces:
+        related_key = key(related)
+        for major in majors:
+            major_key = key(major)
+            stems = (major_key[:4], major_key[:3], major_key[:2])
+            if any(len(stem) >= 2 and stem in related_key for stem in stems):
+                return Assessment(
+                    "review",
+                    f"related-major wording may cover '{major}'; official catalogue needs review: {requirement}",
+                )
+    if "专业目录" in requirement or "学科门类" in requirement or (related_pieces and len(related_pieces) == len(pieces)):
         return Assessment("review", f"no literal major keyword match; official catalogue needs review: {requirement}")
     return Assessment("mismatch", f"none of profile major keywords match: {requirement}")
 
@@ -316,6 +365,8 @@ def assess_political(requirement: str, profile: dict[str, Any]) -> Assessment:
         return Assessment("review", f"political-status requirement: {requirement}; profile omitted this optional field")
     if status in requirement:
         return Assessment("match", f"political status '{status}' appears to meet requirement")
+    if "中共党员" in requirement and "共青团员" not in requirement and status != "中共党员":
+        return Assessment("mismatch", f"requirement '{requirement}' conflicts with stated political status '{status}'")
     if status in {"群众", "无党派人士", "其他"} and ("党员" in requirement or "团员" in requirement):
         return Assessment("mismatch", f"requirement '{requirement}' conflicts with stated political status '{status}'")
     return Assessment("review", f"manual political-status comparison needed: profile={status} / requirement={requirement}")
@@ -423,13 +474,20 @@ def assess_sex(all_text: str, profile: dict[str, Any]) -> Assessment:
     requirement = text(all_text)
     male_markers = ("限男性", "限男", "性别:男", "性别：男")
     female_markers = ("限女性", "限女", "性别:女", "性别：女")
-    requires_male = any(marker in requirement for marker in male_markers)
-    requires_female = any(marker in requirement for marker in female_markers)
+    # Some tables state the restriction as a standalone note (“…，男性，…”)
+    # rather than prefixing it with “限”.  Treat only delimiter-bounded words
+    # as such a restriction, not arbitrary occurrences in prose.
+    standalone_male = re.search(r"(?:^|[；;，,。\s])男性?(?=$|[；;，,。\s])", requirement) is not None
+    standalone_female = re.search(r"(?:^|[；;，,。\s])女性?(?=$|[；;，,。\s])", requirement) is not None
+    requires_male = any(marker in requirement for marker in male_markers) or standalone_male
+    requires_female = any(marker in requirement for marker in female_markers) or standalone_female
     if not requires_male and not requires_female:
         return Assessment("match", "no explicit sex restriction found in mapped text")
     sex = text(profile.get("sex", ""))
     if sex not in {"男", "女"}:
         return Assessment("review", "position has an explicit sex restriction; profile omitted sex")
+    if requires_male and requires_female:
+        return Assessment("review", "position text contains conflicting sex markers; read the official wording")
     if requires_male:
         return Assessment("match" if sex == "男" else "mismatch", "explicit male-only requirement")
     return Assessment("match" if sex == "女" else "mismatch", "explicit female-only requirement")
@@ -452,7 +510,8 @@ def assess_household(all_text: str, profile: dict[str, Any]) -> Assessment:
 
 def assess_fresh_graduate(all_text: str, profile: dict[str, Any]) -> Assessment:
     requirement = text(all_text)
-    if not any(token in requirement for token in ("应届毕业生", "2027年应届", "仅限应届")):
+    fresh_markers = ("应届毕业生", "应届高校毕业生", "2027年应届", "2027届高校毕业生", "2027届毕业生", "仅限应届")
+    if not any(token in requirement for token in fresh_markers):
         return Assessment("match", "no explicit fresh-graduate restriction found in mapped text")
     supplied = profile.get("is_fresh_graduate", None)
     if supplied is None:
@@ -630,8 +689,7 @@ def write_report(
     path: Path,
     *,
     input_path: Path,
-    sheet: str,
-    header_row: int,
+    sheets: list[tuple[str, int, int]],
     column_map: dict[str, str],
     frame: pd.DataFrame,
     profile_path: Path | None,
@@ -643,7 +701,7 @@ def write_report(
         "# Civil-service position preliminary screening",
         "",
         f"- Source workbook: `{input_path}`",
-        f"- Sheet/header: `{sheet}` / Excel row {header_row + 1}",
+        f"- Position-bearing sheets included: {len(sheets)}",
         f"- Profile: {'none (public-table normalization only)' if no_profile else str(profile_path)}",
         f"- Rows read: {len(frame)}",
         "",
@@ -653,6 +711,13 @@ def write_report(
         "- It does not estimate admission probability or use inferred demographic traits.",
         "- Major catalogues, political-status wording, graduation status, service-project rules, and remarks must be checked against the official notice before applying.",
         "- A `初筛不匹配` result only reflects literal fields matched by this script; a `需人工核验` result is not a rejection.",
+        "",
+        "## Sheets included",
+        "",
+    ]
+    for sheet_name, header_row, row_count in sheets:
+        lines.append(f"- `{sheet_name}`: Excel header row {header_row + 1}; {row_count} position row(s)")
+    lines += [
         "",
         "## Detected columns",
         "",
@@ -717,7 +782,7 @@ def main() -> int:
     profile = load_profile(args.profile, args.no_profile)
     profile_path = None if args.no_profile else (args.profile or DEFAULT_PROFILE)
 
-    table, sheet, header_row = load_position_table(input_path, args.sheet)
+    table, sheets = load_position_table(input_path, args.sheet)
     column_map = map_columns(table.columns)
     if len(column_map) < 3:
         raise ValueError(f"Only {len(column_map)} recognizable columns found: {column_map}")
@@ -738,14 +803,13 @@ def main() -> int:
     write_report(
         out / "selection_report.md",
         input_path=input_path,
-        sheet=sheet,
-        header_row=header_row,
+        sheets=sheets,
         column_map=column_map,
         frame=output,
         profile_path=profile_path,
         no_profile=args.no_profile,
     )
-    print(f"Read {len(output)} position rows from {input_path.name} ({sheet}, header row {header_row + 1})")
+    print(f"Read {len(output)} position rows from {input_path.name} across {len(sheets)} position-bearing sheet(s)")
     print(f"Wrote shortlist and audit files to {out}")
     return 0
 
