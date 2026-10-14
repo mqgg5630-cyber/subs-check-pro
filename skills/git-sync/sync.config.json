@@ -43,6 +43,15 @@
     "**/*secret*",
     "**/*token*"
   ],
+  "watched_uploads": [
+    {
+      "enabled": true,
+      "source": "D:\\桌面\\zhiye\\中央机关及其直属机构2027年度考试录用公务员招考简章.xls",
+      "destination": "results/civil_service_exam/source/中央机关及其直属机构2027年度考试录用公务员招考简章.xls",
+      "manifest": "results/civil_service_exam/ingest_manifest.json",
+      "stable_wait_seconds": 2
+    }
+  ],
   "success_criteria": "results/status/success_criteria.json",
   "_note_v2ray": "check_cmd runs code/v2ray_subs/local_run.ps1 on the laptop. Mode comes from results/v2ray_subs/mode.txt (probe|run). Node lists never go into git: they stay on the laptop desktop folder. check_timeout_min raised to 60 for full subs-check-pro runs."
 }

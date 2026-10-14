@@ -1,0 +1,28 @@
+{
+  "education": [
+    "硕士研究生"
+  ],
+  "degree": [
+    "硕士"
+  ],
+  "major_keywords": [
+    "请填写与你毕业证/学位证和专业目录一致的专业关键词"
+  ],
+  "political_status": "",
+  "grassroots_years": null,
+  "has_service_project_experience": null,
+  "is_fresh_graduate": null,
+  "target_locations": [
+    "北京"
+  ],
+  "department_keywords": [],
+  "position_keywords": [],
+  "avoid_keywords": [],
+  "weights": {
+    "location": 35,
+    "department": 20,
+    "position": 20,
+    "major": 15,
+    "eligibility_clarity": 10
+  }
+}

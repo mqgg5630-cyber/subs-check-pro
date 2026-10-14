@@ -47,3 +47,10 @@ monitor.ps1
 .gitignore
 monitor.csv
 monitor.sh
+
+# Local-only civil-service selection inputs/preferences and derived personal
+# shortlists. The public source XLS is copied to the explicit tracked source
+# path by watch.ps1; do not commit an individual profile or local analysis.
+config/civil_service_profile.local.json
+results/civil_service_exam/local_analysis/
+results/civil_service_exam/source/*.partial

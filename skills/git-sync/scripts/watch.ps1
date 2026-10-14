@@ -130,6 +130,9 @@ $AutoPull = $false
 $AutoPush = $false
 $AutoPushPrefix = 'local: auto'
 $AutoPushExclude = @('.env', '.env.*', '**/*.pem', '**/*.key', '**/credentials*', '**/*secret*', '**/*token*')
+# Exact local files that may be copied into the repo before hands-free push.
+# Entries come from sync.config.json -> watched_uploads; no directory scans.
+$WatchedUploads = @()
 if ($cfgPath) {
     $cfg = Get-Content -LiteralPath $cfgPath -Encoding UTF8 -Raw | ConvertFrom-Json
     if ($cfg.branch) { $Branch = [string]$cfg.branch }
@@ -144,6 +147,9 @@ if ($cfgPath) {
     if ($cfg.auto_push_prefix) { $AutoPushPrefix = [string]$cfg.auto_push_prefix }
     if ($cfg.auto_push_exclude) {
         $AutoPushExclude = @($cfg.auto_push_exclude | ForEach-Object { [string]$_ })
+    }
+    if ($cfg.watched_uploads) {
+        $WatchedUploads = @($cfg.watched_uploads)
     }
 }
 if (-not $Branch) { $Branch = (git rev-parse --abbrev-ref HEAD).Trim() }
@@ -818,6 +824,7 @@ if ($Status) {
     Write-Host ("   task        : {0}" -f $taskName)
     Write-Host ("   skill       : {0}" -f $(if ($skillVer) { "v$skillVer" } else { '(unknown)' }))
     Write-Host ("   hands-free  : master={0} auto_pull={1} auto_push={2}" -f $HandsFree, $AutoPull, $AutoPush)
+    Write-Host ("   watched files: {0} exact rule(s)" -f @($WatchedUploads).Count)
     Write-Host ("   state dir   : {0}" -f $stateDir)
     if (-not $ti) {
         Write-Host "   scheduled   : NOT REGISTERED - run .\watch.ps1 -Register" -ForegroundColor Red
@@ -1271,8 +1278,180 @@ function Invoke-AutoPull {
     return 0
 }
 
+function Get-SafeRepoChildPath {
+    # Only permit relative destinations below this repository. A malformed
+    # config entry must never turn the watcher into a general file writer.
+    param([string]$RelativePath)
+    if ([string]::IsNullOrWhiteSpace($RelativePath)) { return '' }
+    try {
+        if ([System.IO.Path]::IsPathRooted($RelativePath)) { return '' }
+        $trimChars = [char[]]"\\/"
+        $rootFull = ([System.IO.Path]::GetFullPath($repo)).TrimEnd($trimChars)
+        $candidate = [System.IO.Path]::GetFullPath((Join-Path $repo $RelativePath))
+        $prefix = $rootFull + [System.IO.Path]::DirectorySeparatorChar
+        if (-not $candidate.StartsWith($prefix, [System.StringComparison]::OrdinalIgnoreCase)) { return '' }
+        return $candidate
+    } catch {
+        return ''
+    }
+}
+
+function Get-WatchedFileSha256 {
+    param([string]$Path)
+    try {
+        $hash = (Get-FileHash -LiteralPath $Path -Algorithm SHA256 -ErrorAction Stop).Hash
+        if ($hash) { return $hash.ToLowerInvariant() }
+    } catch { }
+    return ''
+}
+
+function Test-WatchedFileStable {
+    # Avoid copying a spreadsheet while Excel or another process is still
+    # writing it. The configured pause is deliberately capped so one broken
+    # path can never stall the long-lived watcher.
+    param([string]$Path, [int]$Seconds = 2)
+    try {
+        $before = Get-Item -LiteralPath $Path -ErrorAction Stop
+        if ($before.PSIsContainer) { return $false }
+        $wait = [Math]::Max(0, [Math]::Min(10, $Seconds))
+        if ($wait -gt 0) { Start-Sleep -Seconds $wait }
+        $after = Get-Item -LiteralPath $Path -ErrorAction Stop
+        if ($after.PSIsContainer) { return $false }
+        return ($before.Length -eq $after.Length -and $before.LastWriteTimeUtc.Ticks -eq $after.LastWriteTimeUtc.Ticks)
+    } catch {
+        return $false
+    }
+}
+
+function Write-WatchedUploadManifest {
+    param(
+        [string]$ManifestPath,
+        [string]$SourceName,
+        [string]$DestinationRel,
+        [string]$Sha256,
+        [Int64]$SizeBytes,
+        [datetime]$LastWriteUtc
+    )
+    if (-not $ManifestPath) { return }
+    try {
+        $dir = Split-Path -Parent $ManifestPath
+        if (-not (Test-Path -LiteralPath $dir)) { New-Item -ItemType Directory -Force -Path $dir | Out-Null }
+        $payload = [ordered]@{
+            schema_version = 1
+            file_name = $SourceName
+            destination = ($DestinationRel -replace '\\', '/')
+            sha256 = $Sha256
+            size_bytes = $SizeBytes
+            source_last_write_utc = $LastWriteUtc.ToUniversalTime().ToString('o')
+            copied_utc = (Get-Date).ToUniversalTime().ToString('o')
+        }
+        $json = ($payload | ConvertTo-Json -Depth 4)
+        [System.IO.File]::WriteAllText($ManifestPath, $json + "`r`n", (New-Object System.Text.UTF8Encoding($false)))
+    } catch {
+        Add-Log ("watched_upload: manifest write failed ({0})" -f $_.Exception.Message)
+    }
+}
+
+function Invoke-WatchedUploads {
+    # Copy ONLY the explicitly configured files. This is intentionally separate
+    # from upload.ps1, which is a user-invoked folder uploader; a watcher must
+    # not scan a desktop folder or upload unrelated files.
+    if (-not $WatchedUploads -or @($WatchedUploads).Count -eq 0) { return 0 }
+    $updated = @()
+    $waiting = @()
+    foreach ($entry in @($WatchedUploads)) {
+        try {
+            if ($null -eq $entry) { continue }
+            $enabled = $true
+            if ($null -ne $entry.enabled) { $enabled = [bool]$entry.enabled }
+            if (-not $enabled) { continue }
+
+            $source = [Environment]::ExpandEnvironmentVariables([string]$entry.source)
+            $destinationRel = [string]$entry.destination
+            if ([string]::IsNullOrWhiteSpace($source) -or [string]::IsNullOrWhiteSpace($destinationRel)) {
+                Add-Log 'watched_upload: skipped invalid config (source/destination required)'
+                continue
+            }
+            if (-not (Test-Path -LiteralPath $source -PathType Leaf)) {
+                $waiting += (Split-Path -Leaf $source)
+                continue
+            }
+
+            $waitSeconds = 2
+            if ($null -ne $entry.stable_wait_seconds) {
+                try { $waitSeconds = [int]$entry.stable_wait_seconds } catch { $waitSeconds = 2 }
+            }
+            if (-not (Test-WatchedFileStable -Path $source -Seconds $waitSeconds)) {
+                Add-Log ("watched_upload: source is still changing; defer {0}" -f (Split-Path -Leaf $source))
+                continue
+            }
+
+            $destinationAbs = Get-SafeRepoChildPath $destinationRel
+            $manifestRel = [string]$entry.manifest
+            $manifestAbs = ''
+            if ($manifestRel) { $manifestAbs = Get-SafeRepoChildPath $manifestRel }
+            if (-not $destinationAbs -or ($manifestRel -and -not $manifestAbs)) {
+                Add-Log 'watched_upload: skipped unsafe destination/manifest path'
+                continue
+            }
+
+            $sourceItem = Get-Item -LiteralPath $source -ErrorAction Stop
+            $sourceHash = Get-WatchedFileSha256 $source
+            if (-not $sourceHash) {
+                Add-Log ("watched_upload: cannot hash source {0}" -f (Split-Path -Leaf $source))
+                continue
+            }
+            $destinationHash = ''
+            if (Test-Path -LiteralPath $destinationAbs -PathType Leaf) {
+                $destinationHash = Get-WatchedFileSha256 $destinationAbs
+            }
+
+            # Identical source/destination means this poll has nothing to add.
+            # A missing manifest is repaired without recopying the spreadsheet.
+            if ($destinationHash -eq $sourceHash) {
+                if ($manifestAbs -and -not (Test-Path -LiteralPath $manifestAbs -PathType Leaf)) {
+                    Write-WatchedUploadManifest -ManifestPath $manifestAbs -SourceName $sourceItem.Name -DestinationRel $destinationRel -Sha256 $sourceHash -SizeBytes $sourceItem.Length -LastWriteUtc $sourceItem.LastWriteTimeUtc
+                    $updated += ($manifestRel -replace '\\', '/')
+                }
+                continue
+            }
+
+            $destinationDir = Split-Path -Parent $destinationAbs
+            if (-not (Test-Path -LiteralPath $destinationDir)) { New-Item -ItemType Directory -Force -Path $destinationDir | Out-Null }
+            $temporary = $destinationAbs + '.partial'
+            if (Test-Path -LiteralPath $temporary) { Remove-Item -LiteralPath $temporary -Force -ErrorAction SilentlyContinue }
+            Copy-Item -LiteralPath $source -Destination $temporary -Force -ErrorAction Stop
+            $temporaryHash = Get-WatchedFileSha256 $temporary
+            $sourceAfterHash = Get-WatchedFileSha256 $source
+            if ($temporaryHash -ne $sourceHash -or $sourceAfterHash -ne $sourceHash) {
+                Remove-Item -LiteralPath $temporary -Force -ErrorAction SilentlyContinue
+                Add-Log ("watched_upload: source changed during copy; defer {0}" -f $sourceItem.Name)
+                continue
+            }
+
+            [System.IO.File]::Copy($temporary, $destinationAbs, $true)
+            Remove-Item -LiteralPath $temporary -Force -ErrorAction SilentlyContinue
+            Write-WatchedUploadManifest -ManifestPath $manifestAbs -SourceName $sourceItem.Name -DestinationRel $destinationRel -Sha256 $sourceHash -SizeBytes $sourceItem.Length -LastWriteUtc $sourceItem.LastWriteTimeUtc
+            $updated += ($destinationRel -replace '\\', '/')
+            Add-Log ("watched_upload: copied {0} -> {1}" -f $sourceItem.Name, ($destinationRel -replace '\\', '/'))
+        } catch {
+            Add-Log ("watched_upload: failed ({0})" -f $_.Exception.Message)
+        }
+    }
+    if ($updated.Count -gt 0) {
+        $nowWu = (Get-Date).ToString('yyyy-MM-dd HH:mm:ss')
+        Set-State @{ watched_upload_rules = @($WatchedUploads).Count; last_watched_upload = ($updated -join ', '); last_watched_upload_at = $nowWu }
+        Add-Log ("watched_upload: {0} repo file(s) updated" -f $updated.Count)
+    } elseif ($waiting.Count -gt 0) {
+        Set-State @{ watched_upload_rules = @($WatchedUploads).Count; watched_upload_waiting = ($waiting -join ', ') }
+    }
+    return $updated.Count
+}
+
 function Invoke-AutoPush {
     if (-not $AutoPush) { return 0 }
+    $ingested = Invoke-WatchedUploads
+    if ($ingested -gt 0) { Add-Log ("auto_push: picked up {0} watched file(s)" -f $ingested) }
     $dirty = @(Get-DirtyPaths)
     if ($dirty.Count -eq 0) {
         Add-Log ('auto_push: clean at ' + (Get-Date).ToString('yyyy-MM-dd HH:mm:ss'))
