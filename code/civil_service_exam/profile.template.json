@@ -1,4 +1,6 @@
 {
+  "sex": "",
+  "birth_month": "",
   "education": [
     "硕士研究生"
   ],
@@ -9,12 +11,20 @@
     "请填写与你毕业证/学位证和专业目录一致的专业关键词"
   ],
   "political_status": "",
+  "cet4_passed": null,
+  "cet6_passed": null,
+  "cet6_score": null,
+  "cet6_score_upper_bound": null,
   "grassroots_years": null,
   "has_service_project_experience": null,
   "is_fresh_graduate": null,
-  "target_locations": [
-    "北京"
-  ],
+  "hukou_province": "",
+  "home_province": "",
+  "target_locations": [],
+  "location_preferences": {
+    "首选省份": 35,
+    "备选省份": 12
+  },
   "department_keywords": [],
   "position_keywords": [],
   "avoid_keywords": [],

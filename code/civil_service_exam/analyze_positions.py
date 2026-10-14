@@ -535,8 +535,14 @@ def status_label(assessments: dict[str, Assessment]) -> str:
 def one_row(row: pd.Series, column_map: dict[str, str], profile: dict[str, Any]) -> dict[str, Any]:
     mapped_text = " ".join(
         cell(row, column_map, field)
-        for field in ("position_intro", "remarks", "position", "position_nature", "service_requirement")
+        for field in (
+            "position_intro", "remarks", "position", "position_nature", "service_requirement",
+            "english_requirement", "household_requirement", "political_requirement",
+        )
     )
+    # Some recruitment restrictions live only in a generic remarks column. Use
+    # the full public row for literal self-reported eligibility comparisons.
+    full_public_text = " ".join(text(value) for value in row.tolist())
     assessments = {
         "education": assess_education(cell(row, column_map, "education_requirement"), profile),
         "degree": assess_degree(cell(row, column_map, "degree_requirement"), profile),
@@ -544,6 +550,9 @@ def one_row(row: pd.Series, column_map: dict[str, str], profile: dict[str, Any])
         "political": assess_political(cell(row, column_map, "political_requirement"), profile),
         "grassroots": assess_grassroots(cell(row, column_map, "grassroots_requirement"), profile),
         "service_project": assess_service_project(cell(row, column_map, "service_requirement"), profile),
+        "english": assess_english(full_public_text, profile),
+        "sex": assess_sex(full_public_text, profile),
+        "household": assess_household(full_public_text, profile),
         "fresh_graduate": assess_fresh_graduate(mapped_text, profile),
     }
     score, score_notes = preference_score(row, profile, column_map, assessments)
@@ -569,6 +578,8 @@ def one_row(row: pd.Series, column_map: dict[str, str], profile: dict[str, Any])
             "political_requirement": cell(row, column_map, "political_requirement"),
             "grassroots_requirement": cell(row, column_map, "grassroots_requirement"),
             "service_requirement": cell(row, column_map, "service_requirement"),
+            "english_requirement": cell(row, column_map, "english_requirement"),
+            "household_requirement": cell(row, column_map, "household_requirement"),
             "remarks": cell(row, column_map, "remarks"),
             "preliminary_status": status_label(assessments),
             "preference_score": round(score, 2),
@@ -581,6 +592,9 @@ def one_row(row: pd.Series, column_map: dict[str, str], profile: dict[str, Any])
             "political_check": assessments["political"].status,
             "grassroots_check": assessments["grassroots"].status,
             "service_project_check": assessments["service_project"].status,
+            "english_check": assessments["english"].status,
+            "sex_check": assessments["sex"].status,
+            "household_check": assessments["household"].status,
             "fresh_graduate_check": assessments["fresh_graduate"].status,
         }
     )
