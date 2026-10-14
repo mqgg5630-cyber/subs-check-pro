@@ -62,8 +62,18 @@ COLUMN_ALIASES: dict[str, tuple[str, ...]] = {
     "political_requirement": ("政治面貌", "政治面貌要求"),
     "grassroots_requirement": ("基层工作最低年限", "基层工作年限", "基层工作经历"),
     "service_requirement": ("服务基层项目工作经历", "服务基层项目", "基层服务项目"),
+    "english_requirement": ("外语水平", "外语要求", "英语等级", "英语要求", "四六级要求"),
+    "household_requirement": ("户籍", "户籍要求", "生源地"),
     "location": ("工作地点", "工作所在地", "工作地", "落户地点", "地点"),
     "remarks": ("备注", "其他条件", "说明", "补充说明"),
+}
+
+# A province preference should still match common city-level workplace strings.
+# This is only a location-label expansion, not an inference about the applicant.
+PROVINCE_ALIASES: dict[str, tuple[str, ...]] = {
+    "福建": ("福建", "福州", "厦门", "泉州", "漳州", "莆田", "三明", "南平", "龙岩", "宁德"),
+    "山东": ("山东", "济南", "青岛", "烟台", "潍坊", "威海", "淄博", "临沂", "济宁", "泰安", "日照", "东营", "滨州", "德州", "聊城", "菏泽", "枣庄"),
+    "四川": ("四川", "成都", "绵阳", "德阳", "乐山", "宜宾", "泸州", "南充", "达州", "自贡", "攀枝花", "眉山", "资阳", "广元", "遂宁", "内江", "广安", "雅安", "巴中", "阿坝", "甘孜", "凉山"),
 }
 
 OPEN_REQUIREMENT = ("不限", "无限制", "不限制", "无", "无要求", "专业不限", "无基层工作经历", "没有要求")
@@ -358,6 +368,88 @@ def assess_service_project(requirement: str, profile: dict[str, Any]) -> Assessm
     return Assessment("mismatch", f"requires service-project experience: {requirement}")
 
 
+def assess_english(all_text: str, profile: dict[str, Any]) -> Assessment:
+    requirement = text(all_text)
+    six_matches = list(re.finditer(r"(?:CET[- ]?6|大学英语六级|英语六级).{0,24}", requirement, flags=re.IGNORECASE))
+    four_matches = list(re.finditer(r"(?:CET[- ]?4|大学英语四级|英语四级).{0,24}", requirement, flags=re.IGNORECASE))
+    if not six_matches and not four_matches:
+        return Assessment("match", "no explicit CET-4/CET-6 restriction found in mapped text")
+
+    def score_threshold(matches: list[re.Match[str]]) -> int | None:
+        for match in matches:
+            score = re.search(r"([45]\d{2})\s*分", match.group(0))
+            if score:
+                return int(score.group(1))
+        return None
+
+    if six_matches:
+        passed = profile.get("cet6_passed", None)
+        if passed is None:
+            return Assessment("review", "position appears to require CET-6; profile omitted CET-6 status")
+        if not bool(passed):
+            return Assessment("mismatch", "position appears to require CET-6, but profile states it was not passed")
+        threshold = score_threshold(six_matches)
+        exact = profile.get("cet6_score", None)
+        upper_bound = profile.get("cet6_score_upper_bound", None)
+        if threshold is None:
+            return Assessment("match", "profile states CET-6 passed")
+        if exact not in (None, ""):
+            try:
+                return Assessment("match" if float(exact) >= threshold else "mismatch", f"CET-6 score comparison: {exact} vs {threshold}")
+            except (TypeError, ValueError):
+                return Assessment("review", f"CET-6 score is not numeric: {exact!r}")
+        if upper_bound not in (None, ""):
+            try:
+                if float(upper_bound) < threshold:
+                    return Assessment("mismatch", f"profile CET-6 score is below {threshold}")
+            except (TypeError, ValueError):
+                return Assessment("review", f"CET-6 score upper bound is not numeric: {upper_bound!r}")
+        if threshold <= 425:
+            return Assessment("match", f"CET-6 pass is consistent with threshold {threshold}")
+        return Assessment("review", f"CET-6 pass alone cannot confirm threshold {threshold}")
+
+    passed = profile.get("cet4_passed", None)
+    if passed is None:
+        return Assessment("review", "position appears to require CET-4; profile omitted CET-4 status")
+    if not bool(passed):
+        return Assessment("mismatch", "position appears to require CET-4, but profile states it was not passed")
+    threshold = score_threshold(four_matches)
+    if threshold is None or threshold <= 425:
+        return Assessment("match", "profile states CET-4 passed")
+    return Assessment("review", f"CET-4 pass alone cannot confirm threshold {threshold}")
+
+
+def assess_sex(all_text: str, profile: dict[str, Any]) -> Assessment:
+    requirement = text(all_text)
+    male_markers = ("限男性", "限男", "性别:男", "性别：男")
+    female_markers = ("限女性", "限女", "性别:女", "性别：女")
+    requires_male = any(marker in requirement for marker in male_markers)
+    requires_female = any(marker in requirement for marker in female_markers)
+    if not requires_male and not requires_female:
+        return Assessment("match", "no explicit sex restriction found in mapped text")
+    sex = text(profile.get("sex", ""))
+    if sex not in {"男", "女"}:
+        return Assessment("review", "position has an explicit sex restriction; profile omitted sex")
+    if requires_male:
+        return Assessment("match" if sex == "男" else "mismatch", "explicit male-only requirement")
+    return Assessment("match" if sex == "女" else "mismatch", "explicit female-only requirement")
+
+
+def assess_household(all_text: str, profile: dict[str, Any]) -> Assessment:
+    requirement = text(all_text)
+    if "户籍" not in requirement and "生源" not in requirement:
+        return Assessment("match", "no explicit household-registration restriction found in mapped text")
+    household = text(profile.get("hukou_province", ""))
+    if not household:
+        return Assessment("review", "position text mentions household registration; profile omitted household province")
+    if household in requirement or (household + "省") in requirement:
+        return Assessment("match", f"household province '{household}' appears in requirement")
+    province_words = tuple(PROVINCE_ALIASES)
+    if any(province in requirement for province in province_words):
+        return Assessment("mismatch", f"household province '{household}' does not match stated requirement")
+    return Assessment("review", f"manual household-registration comparison needed: {requirement}")
+
+
 def assess_fresh_graduate(all_text: str, profile: dict[str, Any]) -> Assessment:
     requirement = text(all_text)
     if not any(token in requirement for token in ("应届毕业生", "2027年应届", "仅限应届")):
@@ -370,6 +462,26 @@ def assess_fresh_graduate(all_text: str, profile: dict[str, Any]) -> Assessment:
     return Assessment("mismatch", "position text appears to restrict to fresh graduates")
 
 
+def location_preference_hits(location: str, profile: dict[str, Any]) -> list[tuple[str, float]]:
+    preferences = profile.get("location_preferences", {})
+    if not isinstance(preferences, dict):
+        return []
+    location = text(location)
+    matches: list[tuple[str, float]] = []
+    for region, raw_weight in preferences.items():
+        region = text(region)
+        if not region:
+            continue
+        aliases = PROVINCE_ALIASES.get(region, (region,))
+        if any(alias in location for alias in aliases):
+            try:
+                weight = float(raw_weight)
+            except (TypeError, ValueError):
+                weight = 0.0
+            matches.append((region, weight))
+    return matches
+
+
 def preference_score(row: pd.Series, profile: dict[str, Any], column_map: dict[str, str], assessments: dict[str, Assessment]) -> tuple[float, list[str]]:
     weights = DEFAULT_WEIGHTS.copy()
     weights.update({key: float(value) for key, value in profile.get("weights", {}).items() if key in weights})
@@ -379,10 +491,16 @@ def preference_score(row: pd.Series, profile: dict[str, Any], column_map: dict[s
     notes: list[str] = []
     score = 0.0
 
-    location_hits = any_contains(location, profile.get("target_locations", []))
-    if location_hits:
-        score += weights["location"]
-        notes.append(f"location: {', '.join(location_hits)}")
+    weighted_locations = location_preference_hits(location, profile)
+    if weighted_locations:
+        best_region, best_weight = max(weighted_locations, key=lambda item: item[1])
+        score += best_weight
+        notes.append(f"location: {best_region} (weight {best_weight:g})")
+    else:
+        location_hits = any_contains(location, profile.get("target_locations", []))
+        if location_hits:
+            score += weights["location"]
+            notes.append(f"location: {', '.join(location_hits)}")
     department_hits = any_contains(department_text, profile.get("department_keywords", []))
     if department_hits:
         score += weights["department"]
