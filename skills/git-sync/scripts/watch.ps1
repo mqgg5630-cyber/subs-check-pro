@@ -1359,6 +1359,7 @@ function Invoke-WatchedUploads {
     if (-not $WatchedUploads -or @($WatchedUploads).Count -eq 0) { return 0 }
     $updated = @()
     $waiting = @()
+    $unreadable = @()
     foreach ($entry in @($WatchedUploads)) {
         try {
             if ($null -eq $entry) { continue }
@@ -1398,7 +1399,8 @@ function Invoke-WatchedUploads {
             $sourceItem = Get-Item -LiteralPath $source -ErrorAction Stop
             $sourceHash = Get-WatchedFileSha256 $source
             if (-not $sourceHash) {
-                Add-Log ("watched_upload: cannot hash source {0}" -f (Split-Path -Leaf $source))
+                $unreadable += $sourceItem.Name
+                Add-Log ("watched_upload: source is locked or unreadable; will retry {0}" -f $sourceItem.Name)
                 continue
             }
             $destinationHash = ''
@@ -1440,8 +1442,10 @@ function Invoke-WatchedUploads {
     }
     if ($updated.Count -gt 0) {
         $nowWu = (Get-Date).ToString('yyyy-MM-dd HH:mm:ss')
-        Set-State @{ watched_upload_rules = @($WatchedUploads).Count; last_watched_upload = ($updated -join ', '); last_watched_upload_at = $nowWu }
+        Set-State @{ watched_upload_rules = @($WatchedUploads).Count; last_watched_upload = ($updated -join ', '); last_watched_upload_at = $nowWu; watched_upload_unreadable = ''; watched_upload_waiting = '' }
         Add-Log ("watched_upload: {0} repo file(s) updated" -f $updated.Count)
+    } elseif ($unreadable.Count -gt 0) {
+        Set-State @{ watched_upload_rules = @($WatchedUploads).Count; watched_upload_unreadable = ($unreadable -join ', ') }
     } elseif ($waiting.Count -gt 0) {
         Set-State @{ watched_upload_rules = @($WatchedUploads).Count; watched_upload_waiting = ($waiting -join ', ') }
     }
