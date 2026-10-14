@@ -1,14 +1,17 @@
 # 爆款电商视觉案例库｜公开在线案例｜v3
 
-**生成时间：2026-10-13 12:10 Asia/Shanghai（Asia/Shanghai）**<br>
+**生成时间：2026-10-14 09:12 Asia/Shanghai（Asia/Shanghai）**<br>
 注意：这表示沙箱构建时间；复制到 Windows 后的文件创建 / 修改时间由本机文件系统决定。
 
 ## 交付内容
 
-- `爆款电商视觉案例库_公开在线案例_Accio视觉复刻参考_v3.pdf` — 17 页、已扁平化的案例研究 PDF
-- `爆款电商视觉案例库_公开在线案例_Accio视觉复刻参考_v3.pptx` — 17 页、每页仅一张完整图片的 PPTX
+- `爆款电商视觉案例库_公开在线案例_Accio视觉复刻参考_v3.pdf` — 23 页、已扁平化的案例研究 PDF
+- `爆款电商视觉案例库_公开在线案例_Accio视觉复刻参考_v3.pptx` — 23 页、每页仅一张完整图片的 PPTX
 - `preview_contact_sheet_v3.jpg` — 全页预览
 - `SOURCES_AND_USAGE_BOUNDARIES.md` — 视觉图源、分析图源和使用边界
+- `AI_ASSISTED_RECREATION_TEMPLATE.md` — AI 示范的真实边界、工件清单与迁移清单
+- `ai_recreation_prompt_used.txt` — S0 实际调用提示词原文（Arena 图像模型；非 Accio）
+- `recreation_review_log.csv` — 人工审核风险与改动模板
 
 ## 这版解决的问题
 
@@ -19,6 +22,7 @@
 3. 从每个案例提炼一条具体购买决策逻辑，而不是只评价“好看”；
 4. 把案例翻译成产品介绍问题、资产角色表、PDP 首屏结构和可执行任务书；
 5. 所有图片均作为低分辨率研究摘录，明确不是可商用素材、品牌授权或 Accio 实机输出。
+6. 新增 6 页透明的 AI 辅助复刻示范：来源规则 → 实际提示词 → Arena 的 S0 概念图 → 人审风险单 → S1 人工重建 → 证据账本。它明确不是 Accio 实机运行。
 
 ## 公开来源
 

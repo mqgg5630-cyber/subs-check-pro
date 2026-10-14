@@ -1,6 +1,6 @@
 # Sources and usage boundaries — v3
 
-**Rendered: 2026-10-13 12:10 Asia/Shanghai (Asia/Shanghai)**
+**Rendered: 2026-10-14 09:12 Asia/Shanghai (Asia/Shanghai)**
 
 ## What this deliverable is
 
@@ -11,6 +11,10 @@ This is a Chinese-language visual-analysis and workflow-reference deck. It is **
 The deck includes low-resolution online image excerpts solely to identify and critique the cited ecommerce visual patterns. Product photography, logos, trademarks, page screenshots, brand names and copy remain the property of their respective owners. Do **not** extract, republish, use in paid ads, put into a storefront, or present them as original / licensed assets.
 
 For commercial production, replace every referenced image and brand mark with original photography, original design, or appropriately licensed assets.
+
+## AI-assisted demo assets
+
+The visual labeled **S0** in pages 16–18 is a fictional concept image actually generated in this workspace using Arena's image generator, with the prompt preserved in `ai_recreation_prompt_used.txt`. It was **not** generated in Accio, does not depict a real SKU, and cannot substantiate a product fact or commercial claim. The visual labeled **S1** is a manual, original teaching graphic drawn by the build script after the documented review; it is also not a commercial product asset. The workflow evidence and review template are documented in `AI_ASSISTED_RECREATION_TEMPLATE.md` and `recreation_review_log.csv`.
 
 ## Case sources
 

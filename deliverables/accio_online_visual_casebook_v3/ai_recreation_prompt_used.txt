@@ -1,0 +1,6 @@
+S0 actual image-generation prompt
+================================
+
+A polished 4 by 5 ecommerce concept visual for an entirely fictional, unbranded product called Tide Cup Demo 01. A clean original cobalt blue insulated tumbler with a round handle and a straight straw, centered and clearly silhouetted. Set it on an abstract coral paper backdrop with a seafoam circular shadow and a few simple geometric color swatches. High end studio product photography, crisp edges, soft natural shadow, modern editorial color blocking. Absolutely no text, lettering, logos, trademarks, packaging labels, or resemblance to any existing brand or product design. This is an original fictional product concept for a transparent AI assisted workflow demonstration, not a real commercial item.
+
+Transparency note: This prompt was executed with Arena's image generator in this workspace. It was not executed in Accio. The generated visual is a fictional concept, not a verified product image or a commercial asset.

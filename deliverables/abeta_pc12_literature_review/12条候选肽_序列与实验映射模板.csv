@@ -1,0 +1,13 @@
+candidate_id,sequence_one_letter,length,N_terminus,C_terminus,noncanonical_or_cyclization,fluorophore_or_tag,salt_form,purity_percent,stock_solvent,stock_concentration,Aβ_isoform,Aβ_preparation_or_state,peptide_to_Aβ_ratio,aggregation_readouts,timepoints,PC12_state,PC12_exposure_duration,cell_readouts,positive_control,known_constraints,priority_goal,notes
+P01,,,,,,,,,,,,,,,,,,,,,,,
+P02,,,,,,,,,,,,,,,,,,,,,,,
+P03,,,,,,,,,,,,,,,,,,,,,,,
+P04,,,,,,,,,,,,,,,,,,,,,,,
+P05,,,,,,,,,,,,,,,,,,,,,,,
+P06,,,,,,,,,,,,,,,,,,,,,,,
+P07,,,,,,,,,,,,,,,,,,,,,,,
+P08,,,,,,,,,,,,,,,,,,,,,,,
+P09,,,,,,,,,,,,,,,,,,,,,,,
+P10,,,,,,,,,,,,,,,,,,,,,,,
+P11,,,,,,,,,,,,,,,,,,,,,,,
+P12,,,,,,,,,,,,,,,,,,,,,,,
