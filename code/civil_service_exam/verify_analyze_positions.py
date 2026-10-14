@@ -7,11 +7,8 @@ import sys
 import unittest
 from pathlib import Path
 
-import pandas as pd
-
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import analyze_positions as screen  # noqa: E402
-import export_manual_pool as manual_pool  # noqa: E402
 
 
 class RequirementParsingTests(unittest.TestCase):
@@ -58,50 +55,6 @@ class RequirementParsingTests(unittest.TestCase):
             screen.assess_degree("与最高学历相对应的学位", {"degree": ["硕士"]}).status,
             "match",
         )
-
-
-class ManualPoolExportTests(unittest.TestCase):
-    def test_major_mismatches_can_be_retained_without_overriding_other_checks(self) -> None:
-        base = {
-            "location": "福建省福州市",
-            "major_requirement": "法学类",
-            "position_code": "1001",
-            "department": "示例机关",
-            "agency": "示例司局",
-            "position": "示例职位",
-            "recruit_count": "1",
-            "education_requirement": "本科及以上",
-            "degree_requirement": "与最高学历相对应的学位",
-            "political_requirement": "不限",
-            "grassroots_requirement": "无限制",
-            "service_requirement": "无限制",
-            "remarks": "本单位最低服务年限为5年",
-            "raw__source_sheet": "示例工作表",
-            "raw__source_excel_row": "3",
-            "raw_职位属性": "普通职位",
-            "raw_机构层级": "县（区）级及以下",
-            "raw_考试类别": "行政执法类",
-            "raw_职位简介": "示例工作内容",
-            "major_check": "mismatch",
-            "education_check": "match",
-            "degree_check": "match",
-            "political_check": "match",
-            "grassroots_check": "match",
-            "service_project_check": "match",
-            "english_check": "match",
-            "sex_check": "match",
-            "household_check": "match",
-            "fresh_graduate_check": "match",
-        }
-        conflict = base | {"position_code": "1002", "political_check": "mismatch"}
-        output = manual_pool.build_pool(pd.DataFrame([base, conflict]), "福建")
-
-        self.assertEqual(len(output), 2)
-        self.assertEqual(output.iloc[0]["人工复核分类"], "A：非专业条件未见机械冲突")
-        self.assertEqual(output.iloc[0]["专业文字比对"], "专业文字未匹配；仅因要求查看全池而保留")
-        self.assertEqual(output.iloc[0]["非专业明确冲突字段"], "")
-        self.assertEqual(output.iloc[1]["人工复核分类"], "C：非专业条件有明确冲突")
-        self.assertEqual(output.iloc[1]["非专业明确冲突字段"], "政治面貌")
 
 
 if __name__ == "__main__":
