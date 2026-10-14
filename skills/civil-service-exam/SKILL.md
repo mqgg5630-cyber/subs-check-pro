@@ -48,6 +48,17 @@ before a profile is available. Keep the full personal output local; if a
 shareable deliverable is needed, publish only a redacted, source-referenced
 candidate summary rather than the profile or full personalised export.
 
+When an applicant explicitly asks to examine every position in a target region despite a major mismatch, export a **manual-review pool** rather than relabeling those jobs as eligible or major-unrestricted:
+
+```bash
+python code/civil_service_exam/export_manual_pool.py \
+  --input results/civil_service_exam/local_analysis/all_positions_normalized.csv \
+  --region 福建 \
+  --out deliverables/civil_service_exam_2027/福建_全岗位人工复核池.csv
+```
+
+Use `--exclude-non-major-mismatch` to make a smaller inquiry queue. The pool must retain the original major requirement, source sheet/row, and non-major conflict labels; it must never be described as a final shortlist or as “不限专业” unless that is the literal public-table value.
+
 ## Required review discipline
 
 - Keep three result layers: `初筛可报（仍须按官方公告核验）`, `需人工核验`, and

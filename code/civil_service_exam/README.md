@@ -80,6 +80,17 @@ python3 code/civil_service_exam/analyze_positions.py --no-profile
 python3 code/civil_service_exam/verify_analyze_positions.py -v
 ```
 
+若申请人明确要求查看某省的**全部**岗位，即使专业文字不匹配也不自动排除，先生成私有标准化输出，再导出不含 profile 值的人工核验池：
+
+```bash
+python3 code/civil_service_exam/export_manual_pool.py \
+  --input results/civil_service_exam/local_analysis/all_positions_normalized.csv \
+  --region 福建 \
+  --out deliverables/civil_service_exam_2027/福建_全岗位人工复核池.csv
+```
+
+加上 `--exclude-non-major-mismatch` 可仅保留未发现学历、学位、政治面貌、基层经历、服务项目、外语、性别、户籍/生源、应届身份等**非专业**机械冲突的行。该导出仍不是可报名单：它保留专业不匹配行以供人工询问和目录核验，不能把它们称为“不限专业”。
+
 默认输出位于 `results/civil_service_exam/local_analysis/`，该目录被 `.gitignore` 排除，避免将个人偏好或本机分析结果自动推送。待职位表到达 Arena 后，可在对话中给出你的必要资格与岗位偏好，我会在仓库中单独生成可审计的候选清单。
 
 ## 输出与边界
