@@ -54,3 +54,4 @@ monitor.sh
 config/civil_service_profile.local.json
 results/civil_service_exam/local_analysis/
 results/civil_service_exam/source/*.partial
+__pycache__/
