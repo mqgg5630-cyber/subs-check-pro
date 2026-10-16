@@ -11,6 +11,9 @@
 #           candidate node is tested the way v2rayN's real-ping test does (its own
 #           core, its ping URL, 5 s budget; see v2rayn_realtest.py). Only the nodes
 #           that answer are delivered and imported into a NEW group.
+#   syncsuccess: re-tests the newest Desktop delivery and overwrites that same
+#           folder with only nodes that answer the v2rayN-style test. It does
+#           not import, add a group, switch nodes, or change the system proxy.
 #   uirefresh: uses the running v2rayN UI to refresh its subscription group list
 #           and succeeds only after the named group is visible in that list.
 #   uirestartrealping: after explicit approval, restarts v2rayN once, verifies
@@ -978,6 +981,114 @@ function Invoke-Run {
     Say ('receipt: results/v2ray_subs/' + $name + ' state=' + $r['state'])
 }
 
+# ------------------------------------------------ sync successful nodes mode
+function Invoke-SyncSuccess {
+    # Re-test the links already in the newest Desktop delivery using v2rayN's
+    # cores and ping URL, then overwrite THAT SAME folder with only successes.
+    # No subscription group, active node, or system-proxy setting is changed.
+    # Link-bearing test artifacts remain under LOCALAPPDATA and never enter git.
+    $script:exitCode = 2
+    $st = Read-Settings
+    $desk = [Environment]::GetFolderPath('Desktop')
+    $r = @{ mode = 'syncsuccess'; stamp = $stamp; started = (Get-Date).ToString('yyyy-MM-dd HH:mm:ss'); state = 'failed'; stage = 'find'; overwritten = $false }
+    $tmpDir = ''
+    try {
+        $cand = @(Get-ChildItem -LiteralPath $desk -Directory -Filter ([string]$st.desktop_folder_prefix + '*') -ErrorAction SilentlyContinue | Where-Object { Test-Path -LiteralPath (Join-Path $_.FullName 'v2ray_subscription_base64.txt') } | Sort-Object -Property Name -Descending)
+        if ($cand.Count -eq 0) { throw 'no previous Desktop delivery with a subscription file was found' }
+        $folder = [string]$cand[0].FullName
+        $r['folder'] = 'Desktop\' + [string]$cand[0].Name
+
+        $r['stage'] = 'collect'
+        $info = Get-NodeInfo (Join-Path $folder 'v2ray_subscription_base64.txt')
+        $sourceNodes = @($info['nodes'])
+        if ($sourceNodes.Count -eq 0) { throw 'the previous Desktop subscription contains no share links' }
+        $r['source_nodes'] = [int]$sourceNodes.Count
+
+        $r['stage'] = 'v2rayn-test'
+        $v = Find-V2rayN
+        if (-not $v.hasDb -or $v.procCount -eq 0) { throw 'v2rayN is not running (or its database was not found), so successful nodes cannot be re-verified' }
+        $py = Find-Python
+        if ($null -eq $py) { throw 'python 3 is required for the v2rayN-style successful-node test' }
+        $work = Join-Path $env:LOCALAPPDATA 'subs-check-pro-d2a66b2d'
+        $rtDir = Join-Path $work ('syncsuccess\' + $stamp)
+        $test = Invoke-V2rayNTest $v $py $sourceNodes 'previous_desktop_folder' $rtDir
+        if ($test.error) { throw ('v2rayN-style test failed: ' + [string]$test.error) }
+        if ($test.passed -le 0 -or $test.passedLinks.Count -le 0) { throw 'no node in the previous Desktop folder passed the v2rayN-style test; folder was left unchanged' }
+        $nodes = @($test.passedLinks | Select-Object -Unique)
+        if ($nodes.Count -eq 0) { throw 'the successful-node list was empty after de-duplication; folder was left unchanged' }
+        $hist = @{}
+        foreach ($n in $nodes) {
+            $scheme = (($n -split '://', 2)[0]).ToLower()
+            if ($hist.ContainsKey($scheme)) { $hist[$scheme] = [int]$hist[$scheme] + 1 } else { $hist[$scheme] = 1 }
+        }
+        $breakdown = Get-Breakdown $hist
+        $r['v2rayn_test'] = @{ tested = [int]$test.tested; passed = [int]$nodes.Count; ping_url = [string]$test.summary.ping_url; cores = $test.summary.cores; by_reason = $test.summary.by_reason }
+        $r['node_counts'] = @{ total = [int]$nodes.Count; by_scheme = $hist }
+        Say ('syncsuccess: tested ' + [string]$test.tested + ' previous nodes; keeping ' + [string]$nodes.Count + ' (' + $breakdown + ')')
+
+        # Write all replacement payloads to a private temporary directory first.
+        $r['stage'] = 'write'
+        $tmpDir = Join-Path $work ('syncsuccess\payload_' + $stamp)
+        New-Item -ItemType Directory -Force -Path $tmpDir | Out-Null
+        $tmpSub = Join-Path $tmpDir 'v2ray_subscription_base64.txt'
+        $tmpPlain = Join-Path $tmpDir 'v2ray_nodes_plain.txt'
+        $tmpReadme = Join-Path $tmpDir 'README.txt'
+        $tmpManifest = Join-Path $tmpDir 'manifest.json'
+        $payload = (($nodes -join "`n") + "`n")
+        Write-Utf8 $tmpSub ([Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($payload)) + "`n")
+        Write-Utf8 $tmpPlain $payload
+        $tpl = [string](Get-Content -LiteralPath (Join-Path $repo 'code\v2ray_subs\desktop_readme.txt') -Raw -Encoding UTF8)
+        $txt = $tpl
+        $txt = $txt.Replace('{{generated_at}}', (Get-Date).ToString('yyyy-MM-dd HH:mm'))
+        $txt = $txt.Replace('{{version}}', [string]$st.subs_check_pro_version)
+        $txt = $txt.Replace('{{source_count}}', [string](@($st.sub_urls_remote).Count))
+        $txt = $txt.Replace('{{total}}', [string]$nodes.Count)
+        $txt = $txt.Replace('{{breakdown}}', $breakdown)
+        $txt = $txt.Replace('{{import_line}}', 'v2rayN: not changed by syncsuccess. This existing Desktop folder was overwritten with nodes that passed a new v2rayN-style real-connectivity test.')
+        Write-Utf8 $tmpReadme $txt $true
+        $files = @()
+        foreach ($f in @($tmpSub, $tmpPlain, $tmpReadme)) {
+            $fi = Get-Item -LiteralPath $f
+            $files += @{ name = $fi.Name; bytes = $fi.Length; sha256 = (Get-FileHash -LiteralPath $f -Algorithm SHA256).Hash.ToLower() }
+        }
+        $manifest = @{
+            generated = (Get-Date).ToString('yyyy-MM-dd HH:mm:ss')
+            overwritten_by = 'syncsuccess mode: retested the previous Desktop list and kept only nodes that answered the v2rayN-style test'
+            source_nodes = [int]$sourceNodes.Count
+            successful_nodes = [int]$nodes.Count
+            subs_check_pro = [string]$st.subs_check_pro_version
+            source_index_count = @($st.sub_urls_remote).Count
+            node_counts = $r['node_counts']
+            files = $files
+            v2rayn = @{ changed = $false; note = 'no v2rayN import or group update was performed by syncsuccess' }
+            note = 'counts and hashes only; node links remain only in this Desktop folder and the local work directory'
+        }
+        Write-Utf8 $tmpManifest (($manifest | ConvertTo-Json -Depth 7) + "`n")
+
+        # The requested overwrite happens only after every replacement file exists.
+        Copy-Item -LiteralPath $tmpSub -Destination (Join-Path $folder 'v2ray_subscription_base64.txt') -Force
+        Copy-Item -LiteralPath $tmpPlain -Destination (Join-Path $folder 'v2ray_nodes_plain.txt') -Force
+        Copy-Item -LiteralPath $tmpReadme -Destination (Join-Path $folder 'README.txt') -Force
+        Copy-Item -LiteralPath $tmpManifest -Destination (Join-Path $folder 'manifest.json') -Force
+        $r['files'] = $files
+        $r['overwritten'] = $true
+        $r['stage'] = 'passed'
+        $r['state'] = 'ok'
+        $script:exitCode = 0
+        Say ('syncsuccess: overwrote ' + [string]$r['folder'] + ' with ' + [string]$nodes.Count + ' re-verified successful nodes; v2rayN was not changed')
+    } catch {
+        $r['error'] = [string]$_.Exception.Message
+        Say ('FAILED at stage ' + [string]$r['stage'] + ': ' + $r['error'])
+    } finally {
+        if ($tmpDir -and (Test-Path -LiteralPath $tmpDir)) { Remove-Item -LiteralPath $tmpDir -Recurse -Force -ErrorAction SilentlyContinue }
+    }
+    $r['finished'] = (Get-Date).ToString('yyyy-MM-dd HH:mm:ss')
+    $name = Write-Receipt $r
+    Say ('receipt: results/v2ray_subs/' + $name + ' state=' + $r['state'])
+    # This is a one-shot user-approved overwrite; prevent later watcher rounds from repeating it.
+    Write-Utf8 (Join-Path $outDir 'mode.txt') "probe`n"
+}
+
 # ---------------------------------------------------------------- export mode
 function Invoke-Export {
     # Runs only after the user explicitly confirmed a PUBLIC push. Copies the
@@ -1033,6 +1144,7 @@ switch ($Mode) {
     'probe' { Invoke-Probe }
     'run' { Invoke-Run }
     'realtest' { $script:realtest = $true; Invoke-Run }
+    'syncsuccess' { Invoke-SyncSuccess }
     'uirefresh' { Invoke-UiRefresh }
     'uirestartrealping' { Invoke-UiRestartRealPing }
     'elevatedrealping' { Invoke-ElevatedUiRestartRealPing }
